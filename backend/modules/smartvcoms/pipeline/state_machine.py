@@ -169,6 +169,19 @@ def _calculate_sla_minutes(arrival_time, sla_deadline, flow_type, sla_cfg_map):
     return calculate_sla_minutes_common(arrival_time, sla_deadline, flow_type, sla_cfg_map)
 
 
+def _set_wait_accept_arrival_time(case: dict[str, Any], transition_dt: datetime, flow_type: str, sla_cfg_map: dict[str, Any]) -> None:
+    if str(case.get("arrival_time") or "").strip():
+        return
+    case["arrival_time"] = transition_dt.isoformat()
+    if pd.notna(pd.to_datetime(case.get("sla_deadline"), errors="coerce")):
+        case["sla_minutes"] = _calculate_sla_minutes(
+            case.get("arrival_time"),
+            case.get("sla_deadline"),
+            case.get("flow_type") or flow_type,
+            sla_cfg_map,
+        )
+
+
 def normalize_subject_for_classify(subject: str) -> str:
     s = str(subject or "").strip()
     if not s:
@@ -1043,12 +1056,10 @@ def rebuild_from_raw(
                         if existing_group_keys:
                             case_key = existing_group_keys[-1]
 
-                    # For ARRIVAL duplicates, still backfill arrival on target case if missing.
+                    # For ARRIVAL duplicates, keep counting sender/group and only set arrival_time
+                    # when the case actually transitions into WAIT_ACCEPT.
                     if event_type == "ARRIVAL" and case_key and case_key in cases:
                         tgt = cases[case_key]
-                        if not str(tgt.get("arrival_time") or "").strip():
-                            tgt["arrival_time"] = received_dt.isoformat()
-                            
                         # Luôn luôn cộng bộ đếm và check Sender cho dù là email gom nhóm
                         tgt["arrival_event_count"] = int(tgt.get("arrival_event_count") or 0) + 1
                         sender_key = (case_key, str(r.get("sender_email") or r.get("sender_name") or "").strip().lower())
@@ -1059,9 +1070,11 @@ def rebuild_from_raw(
                         if "ONLINE" in flow_tgt.upper() and sender_arrival_count >= 2 and tgt.get("current_stage_code") in {"ARRIVAL", "WAIT_ACCEPT"}:
                             tgt["current_stage_code"] = "WAIT_ACCEPT"
                             tgt["current_stage_label"] = "Chờ tiếp nhận"
+                            _set_wait_accept_arrival_time(tgt, received_dt, flow_tgt, sla_cfg_map)
                         elif "ONLINE" not in flow_tgt.upper() and tgt.get("current_stage_code") == "ARRIVAL":
                             tgt["current_stage_code"] = "WAIT_ACCEPT"
                             tgt["current_stage_label"] = "Chờ tiếp nhận"
+                            _set_wait_accept_arrival_time(tgt, received_dt, flow_tgt, sla_cfg_map)
                             
                         tgt["last_event_time"] = received_dt.isoformat()
                         tgt["last_event_type"] = event_type
@@ -1127,7 +1140,7 @@ def rebuild_from_raw(
                         "current_stage_label": stage_label,
                         "current_status": curr_status,
                         "completion_type": "",
-                        "arrival_time": received_dt.isoformat() if event_type in {"ARRIVAL", "LC_REQUEST"} else None,
+                        "arrival_time": received_dt.isoformat() if event_type == "LC_REQUEST" or stage_code == "WAIT_ACCEPT" else None,
                         "accepted_time": received_dt.isoformat() if event_type == "ACCEPTED" else None,
                         "sla_changed_time": None,
                         "returned_time": received_dt.isoformat() if event_type == "RETURNED" else None,
@@ -1138,7 +1151,7 @@ def rebuild_from_raw(
                         "completed_time": received_dt.isoformat() if event_type in {"RETURNED", "DISBURSED"} else None,
                         "sla_deadline": sla_deadline.isoformat() if pd.notna(sla_deadline) else None,
                         "sla_minutes": _calculate_sla_minutes(
-                            received_dt if event_type in {"ARRIVAL", "LC_REQUEST"} else None,
+                            received_dt if event_type == "LC_REQUEST" or stage_code == "WAIT_ACCEPT" else None,
                             sla_deadline,
                             flow,
                             sla_cfg_map
@@ -1206,9 +1219,11 @@ def rebuild_from_raw(
                     if "ONLINE" in str(flow).upper() and sender_arrival_count >= 2 and case.get("current_stage_code") in {"ARRIVAL", "WAIT_ACCEPT"}:
                         case["current_stage_code"] = "WAIT_ACCEPT"
                         case["current_stage_label"] = "Chờ tiếp nhận"
+                        _set_wait_accept_arrival_time(case, received_dt, flow, sla_cfg_map)
                     elif "ONLINE" not in str(flow).upper():
                         case["current_stage_code"] = "WAIT_ACCEPT"
                         case["current_stage_label"] = "Chờ tiếp nhận"
+                        _set_wait_accept_arrival_time(case, received_dt, flow, sla_cfg_map)
                 elif event_type == "ACCEPTED":
                     case["accepted_time"] = received_dt.isoformat()
                     case["current_stage_code"] = "PROCESSING"

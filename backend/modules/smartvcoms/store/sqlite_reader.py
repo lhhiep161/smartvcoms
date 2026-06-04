@@ -248,7 +248,7 @@ def load_case_state_as_dashboard(db_path: str | Path) -> pd.DataFrame:
                 current_stage_label AS "Tiến độ HS",
                 account_number AS "Số tài khoản",
                 current_status AS "Trạng thái Luồng",
-                arrival_time AS "Thời gian nhận email",
+                created_at AS "Thời gian nhận email",
                 updated_at AS "Cập nhật cuối",
                 entry_id_last AS "EntryID",
                 sla_minutes AS "Thời gian SLA",
