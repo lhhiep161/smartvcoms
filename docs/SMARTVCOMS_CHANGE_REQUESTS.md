@@ -14,9 +14,9 @@ Tài liệu này tổng hợp các nội dung cần chỉnh sửa đã chốt. M
 |---|---:|---|
 | Rule Engine - chọn Cán bộ trong bảng Assignment | DONE | Đã đổi sang select native, lưu ID_CB, bổ sung GET `/api/vcoms/admin/rules`. Khi test local nếu vẫn thấy UI cũ cần build/restart frontend/backend và hard refresh. |
 | Tab Quản trị - tự load mặc định bảng Phân bổ SLA | DONE | Đã thêm `ensure_default_sla_config()`, tự ghi key thiếu vào SQLite, không overwrite giá trị cũ, bảng Phân bổ SLA đã có dữ liệu sau reload. |
-| Chuẩn hóa ID_CB/Tên CB | TODO | Bước tiếp theo. Cần sửa backend tính toán và mapping hiển thị. |
-| Đồng nhất `sla_minutes` và cấu hình thời gian làm việc/SLA | TODO | Cần sửa `state_machine.py`, `utils.py`, fallback trong config/admin và phần hiển thị/thống kê nếu bị ảnh hưởng. |
-| Quy định lại `arrival_time` | TODO | Làm sau khi ổn định ID_CB và calendar SLA. Giữ nguyên LC nếu không liên quan. |
+| Chuẩn hóa ID_CB/Tên CB | DONE | Đã chuẩn hóa logic nội bộ dùng ID_CB, bỏ cộng trùng ID_CB + Tên cán bộ, assignment trả ID_CB, manual override lưu ID_CB, Kanban tách `cb_id` và tên hiển thị. |
+| Đồng nhất `sla_minutes` và cấu hình thời gian làm việc/SLA | TODO | Bước tiếp theo. Cần sửa `state_machine.py`, `utils.py`, fallback trong config/admin và phần hiển thị/thống kê nếu bị ảnh hưởng. |
+| Quy định lại `arrival_time` | TODO | Làm sau khi ổn định SLA/calendar. Giữ nguyên LC nếu không liên quan. |
 | Giảm giãn cách dòng Bàn điều phối | TODO | Chỉ chỉnh CSS/density, không đổi logic dữ liệu. |
 | Nghiệm thu tổng hợp | TODO | Chạy cuối cùng. |
 
@@ -195,72 +195,17 @@ Giữ nguyên giờ/phút của `sla_deadline`.
 
 ## 4. Chuẩn hóa ID CB và Tên CB
 
-### 4.1. Nguyên tắc mới
+### 4.1. Trạng thái
 
 ```text
-Email có thể đọc ra tên cán bộ.
-
-Nhưng ngay khi đưa vào hệ thống:
-Tên cán bộ -> map sang ID_CB.
-
-Từ đó trở đi:
-mọi tính toán/phân giao/cộng tải chỉ dùng ID_CB.
-
-Tên cán bộ chỉ dùng để hiển thị nếu cần.
+DONE
 ```
 
-### 4.2. Khi đọc email
+Đã hoàn thành theo review code sau khi bổ sung sửa `recalculate_config_load()` và filter trạng thái Ready.
 
-Nếu email có:
+### 4.2. Nội dung đã xử lý
 
-```text
-Hồ sơ được xử lý bởi cán bộ: Nguyễn Văn A
-```
-
-hệ thống phải map sang `ID_CB` tương ứng trong `config_cb_full`.
-
-Sau đó xử lý bằng `ID_CB`.
-
-### 4.3. Khi phân giao tự động
-
-Hàm phân giao phải trả về `ID_CB`, không trả về tên cán bộ.
-
-Cần đổi sang:
-
-```text
-- Chọn theo Điểm Phân Giao
-- Nếu bằng nhau thì theo Lần giao cuối
-- Kết quả trả về ID_CB
-```
-
-### 4.4. Khi tính tải CB
-
-Các chỉ tiêu sau chỉ tính theo `ID_CB`:
-
-```text
-- Đang xử lý
-- Tổng phút SLA
-- Điểm Phân Giao
-- Lần giao cuối
-```
-
-Không cộng kiểu:
-
-```text
-ID_CB + Tên Cán bộ
-```
-
-### 4.5. Khi hiển thị
-
-Web có thể hiển thị tên cán bộ, nhưng phải map từ:
-
-```text
-ID_CB -> Tên Cán bộ
-```
-
-Không dùng tên cán bộ làm khóa xử lý nội bộ.
-
-### 4.6. File/khu vực có thể bị ảnh hưởng
+Các file đã sửa:
 
 ```text
 backend/modules/smartvcoms/pipeline/state_machine.py
@@ -268,8 +213,102 @@ backend/modules/smartvcoms/pipeline/assignment.py
 backend/modules/smartvcoms/store/config_admin.py
 backend/modules/smartvcoms/services/admin_service.py
 backend/modules/smartvcoms/services/actions_service.py
-backend/modules/smartvcoms/services/kanban_service.py nếu cần mapping hiển thị ID_CB -> Tên CB
-backend/modules/smartvcoms/store/sqlite_reader.py nếu cần đảm bảo dashboard output không làm mất ID_CB
+backend/modules/smartvcoms/services/kanban_service.py
+```
+
+Không cần sửa:
+
+```text
+backend/modules/smartvcoms/store/sqlite_reader.py
+```
+
+Đã xử lý:
+
+```text
+- Tên CB đọc từ email được normalize sang ID_CB trước khi gán assigned_officer.
+- assigned_officer lưu ID_CB.
+- assign_officer() trả ID_CB, không trả tên CB.
+- recalculate_config_load() hỗ trợ cả dashboard schema và internal case schema.
+- recalculate_config_load() hỗ trợ dashboard schema: CB HTTD + Thời gian SLA.
+- recalculate_config_load() hỗ trợ internal schema: assigned_officer + sla_minutes.
+- Officer column đều normalize qua _normalize_cb_id() rồi group theo ID_CB.
+- update_last_assigned() match theo ID_CB.
+- sync_config_cb_load_from_case_state() normalize dữ liệu cũ theo tên sang ID_CB nếu map chắc chắn, rồi chỉ group/tính theo ID_CB.
+- admin_service.py tính Đang xử lý, Tổng phút SLA, Điểm Phân Giao chỉ theo ID_CB.
+- manual override nhập tên hoặc ID đều normalize và lưu ID_CB vào assigned_officer.
+- Kanban giữ cb_id = ID_CB, cb_httd là tên hiển thị nếu map được.
+- Filter trạng thái Ready đã dùng strip + lower trong assign_officer() và _evaluate_assignment().
+```
+
+### 4.3. SQL/test nhanh
+
+Kiểm tra không còn cộng trùng theo tên:
+
+```sql
+SELECT assigned_officer, COUNT(*) AS so_hoso, COALESCE(SUM(sla_minutes), 0) AS tong_sla
+FROM vcoms_case_state
+WHERE business_date = date('now')
+GROUP BY assigned_officer
+ORDER BY assigned_officer;
+```
+
+Đối chiếu bảng tải CB:
+
+```sql
+SELECT id_cb, ten_can_bo, dang_xu_ly, tong_phut_sla, diem_phan_giao
+FROM config_cb_full
+ORDER BY id_cb;
+```
+
+Kiểm tra còn case cũ lưu theo tên mà map được hay không:
+
+```sql
+SELECT s.assigned_officer, c.id_cb, c.ten_can_bo
+FROM vcoms_case_state s
+JOIN config_cb_full c
+  ON UPPER(TRIM(s.assigned_officer)) = UPPER(TRIM(c.ten_can_bo))
+WHERE s.business_date = date('now');
+```
+
+Kỳ vọng sau khi sync/load lại:
+
+```text
+Query trên giảm về 0 hoặc chỉ còn các tên không map được.
+```
+
+Test nhanh bằng DataFrame nội bộ:
+
+```python
+import pandas as pd
+from backend.modules.smartvcoms.pipeline.assignment import recalculate_config_load
+
+cb_cfg = pd.DataFrame([
+    {"ID_CB": "CB01", "Tên Cán bộ": "Nguyen Van A", "Trạng thái": " Ready ", "Phút Bù Trừ": 0},
+    {"ID_CB": "CB02", "Tên Cán bộ": "Tran Van B", "Trạng thái": "ready", "Phút Bù Trừ": 0},
+])
+
+cases_df = pd.DataFrame([
+    {"assigned_officer": "CB01", "sla_minutes": 30},
+    {"assigned_officer": "Nguyen Van A", "sla_minutes": 15},
+    {"assigned_officer": "CB02", "sla_minutes": 20},
+])
+
+print(recalculate_config_load(cb_cfg, cases_df)[["ID_CB", "Tổng phút SLA"]])
+```
+
+Kỳ vọng:
+
+```text
+CB01 = 45
+CB02 = 20
+Không có cộng tách riêng theo tên và ID.
+```
+
+### 4.4. Lưu ý restart
+
+```text
+- Cần restart backend vì có sửa Python.
+- Không cần restart frontend vì không sửa frontend trong bước này.
 ```
 
 ---
@@ -488,7 +527,7 @@ Giá trị giờ mặc định để tương thích hành vi hiện tại:
 
 ---
 
-## 8. Danh sách file/khu vực cần sửa
+## 8. Danh sách file/khu vực cần sửa còn lại
 
 ### 8.1. Backend
 
@@ -496,26 +535,30 @@ Giá trị giờ mặc định để tương thích hành vi hiện tại:
 backend/modules/smartvcoms/pipeline/state_machine.py
 ```
 
-Cần sửa:
+Cần sửa còn lại:
 
 ```text
 - logic set arrival_time khi hồ sơ chuyển Chờ T.Nhận
 - _calculate_sla_minutes(...)
-- normalize cán bộ từ email sang ID_CB
-- gán assigned_officer bằng ID_CB
 - giữ nguyên logic LC nếu không liên quan yêu cầu trên
+```
+
+Trạng thái đã xong trong file này:
+
+```text
+- normalize cán bộ từ email sang ID_CB: DONE
+- gán assigned_officer bằng ID_CB: DONE
+- filter Ready trong _evaluate_assignment(): DONE
 ```
 
 ```text
 backend/modules/smartvcoms/pipeline/assignment.py
 ```
 
-Cần sửa:
+Trạng thái:
 
 ```text
-- assign_officer() trả về ID_CB
-- recalculate_config_load() tính tải theo ID_CB
-- update_last_assigned() cập nhật theo ID_CB
+DONE - assign_officer() trả về ID_CB, recalculate_config_load() hỗ trợ dashboard/internal schema, update_last_assigned() cập nhật theo ID_CB, filter Ready dùng strip + lower.
 ```
 
 ```text
@@ -526,13 +569,13 @@ Cần sửa còn lại:
 
 ```text
 - fallback sla_minutes không được tính thô
-- sync_config_cb_load_from_case_state() chỉ tính theo ID_CB
-- không cộng name + cb_id
 ```
 
 Trạng thái đã xong trong file này:
 
 ```text
+- sync_config_cb_load_from_case_state() chỉ tính theo ID_CB: DONE
+- không cộng name + cb_id: DONE
 - ensure_default_sla_config() / default SLA config: DONE
 ```
 
@@ -540,18 +583,10 @@ Trạng thái đã xong trong file này:
 backend/modules/smartvcoms/services/admin_service.py
 ```
 
-Cần sửa còn lại:
+Trạng thái:
 
 ```text
-- Đang xử lý chỉ tính theo ID_CB
-- Tổng SLA chỉ tính theo ID_CB
-- Điểm Phân Giao = Tổng SLA theo ID_CB + Phút Bù Trừ
-```
-
-Trạng thái đã xong trong file này:
-
-```text
-- trả về sla_config mặc định nếu thiếu/rỗng: DONE
+DONE - Đang xử lý chỉ tính theo ID_CB, Tổng SLA chỉ tính theo ID_CB, Điểm Phân Giao = Tổng SLA theo ID_CB + Phút Bù Trừ, default SLA config đã trả về đầy đủ.
 ```
 
 ```text
@@ -573,19 +608,7 @@ backend/modules/smartvcoms/services/actions_service.py
 Trạng thái:
 
 ```text
-- load_rule_engine_config(): DONE nếu đã được thêm trong bước Rule Engine.
-- GET rules đọc từ vcoms_routing_rules và vcoms_assignment_rules: DONE nếu route đã test thành công.
-- manual override CB nếu nhập tên hoặc ID thì normalize về ID_CB: TODO, làm ở bước chuẩn hóa ID_CB.
-```
-
-```text
-backend/modules/smartvcoms/router.py
-```
-
-Trạng thái:
-
-```text
-GET /api/vcoms/admin/rules: DONE nếu đã test load rule thành công.
+DONE - load_rule_engine_config(), GET rules, manual override CB normalize về ID_CB.
 ```
 
 ```text
@@ -595,21 +618,30 @@ backend/modules/smartvcoms/store/sqlite_reader.py
 Cần kiểm tra/sửa:
 
 ```text
-- REQUIRED_SLA_KEYS phải giữ bộ key cũ O1/O2/O3/O5/O6 nếu đang dùng.
 - mapping arrival_time sang dashboard sau khi đổi semantics.
-- output dashboard không làm mất ID_CB.
+```
+
+Trạng thái:
+
+```text
+- Không cần sửa cho bước ID_CB.
 ```
 
 ```text
 backend/modules/smartvcoms/services/kanban_service.py
 ```
 
-Cần kiểm tra/sửa:
+Cần kiểm tra/sửa còn lại:
 
 ```text
-- mapping ID_CB -> Tên cán bộ để hiển thị nếu cần.
-- không dùng tên cán bộ làm khóa logic.
 - không hiểu sai arrival_time sau khi đổi semantics.
+```
+
+Trạng thái đã xong:
+
+```text
+- mapping ID_CB -> Tên cán bộ để hiển thị: DONE
+- không dùng tên cán bộ làm khóa logic: DONE
 ```
 
 ```text
@@ -710,12 +742,16 @@ Không xét ngày nghỉ/lễ.
 ### Test 5: ID_CB
 
 ```text
+DONE
+
 Email đọc ra tên CB -> map sang ID_CB.
 assigned_officer lưu ID_CB.
 Tổng SLA chỉ cộng theo ID_CB.
 Đang xử lý chỉ đếm theo ID_CB.
 Điểm Phân Giao chỉ tính theo ID_CB.
 Tên CB chỉ dùng để hiển thị.
+recalculate_config_load() hỗ trợ cả dashboard schema và internal case schema.
+Filter Ready xử lý được khoảng trắng/chữ hoa-thường.
 ```
 
 ### Test 6: Rule Engine
@@ -756,14 +792,13 @@ Các key cũ O1/O2/O3/O5/O6 không bị mất.
 
 ## 11. Ghi chú triển khai
 
-Thứ tự thực hiện tiếp theo sau khi Rule Engine và Default SLA Config đã hoàn thành:
+Thứ tự thực hiện tiếp theo sau khi Rule Engine, Default SLA Config và ID_CB đã hoàn thành:
 
 ```text
-1. Chuẩn hóa ID_CB trong assignment/admin/config/manual override và mapping hiển thị.
-2. Đồng nhất sla_minutes + calendar cấu hình.
-3. Sửa arrival_time theo WAIT_ACCEPT.
-4. Giảm giãn cách dòng Bàn điều phối.
-5. Chạy lại toàn bộ test nghiệm thu ở mục 10.
+1. Đồng nhất sla_minutes + calendar cấu hình.
+2. Sửa arrival_time theo WAIT_ACCEPT.
+3. Giảm giãn cách dòng Bàn điều phối.
+4. Chạy lại toàn bộ test nghiệm thu ở mục 10.
 ```
 
 Lưu ý khi test frontend:
