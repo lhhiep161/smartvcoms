@@ -13,8 +13,8 @@ Tài liệu này tổng hợp các nội dung cần chỉnh sửa đã chốt. M
 | Nhóm việc | Trạng thái | Ghi chú |
 |---|---:|---|
 | Rule Engine - chọn Cán bộ trong bảng Assignment | DONE | Đã đổi sang select native, lưu ID_CB, bổ sung GET `/api/vcoms/admin/rules`. Khi test local nếu vẫn thấy UI cũ cần build/restart frontend/backend và hard refresh. |
-| Tab Quản trị - tự load mặc định bảng Phân bổ SLA | TODO | Bước tiếp theo nên làm. Cần giữ cả bộ key cũ O1/O2/O3/O5/O6. |
-| Chuẩn hóa ID_CB/Tên CB | TODO | Cần sửa cả backend tính toán và mapping hiển thị. |
+| Tab Quản trị - tự load mặc định bảng Phân bổ SLA | DONE | Đã thêm `ensure_default_sla_config()`, tự ghi key thiếu vào SQLite, không overwrite giá trị cũ, bảng Phân bổ SLA đã có dữ liệu sau reload. |
+| Chuẩn hóa ID_CB/Tên CB | TODO | Bước tiếp theo. Cần sửa backend tính toán và mapping hiển thị. |
 | Đồng nhất `sla_minutes` và cấu hình thời gian làm việc/SLA | TODO | Cần sửa `state_machine.py`, `utils.py`, fallback trong config/admin và phần hiển thị/thống kê nếu bị ảnh hưởng. |
 | Quy định lại `arrival_time` | TODO | Làm sau khi ổn định ID_CB và calendar SLA. Giữ nguyên LC nếu không liên quan. |
 | Giảm giãn cách dòng Bàn điều phối | TODO | Chỉ chỉnh CSS/density, không đổi logic dữ liệu. |
@@ -284,31 +284,7 @@ DONE
 
 Đã hoàn thành theo test thực tế.
 
-### 5.2. Vấn đề ban đầu
-
-Trên tab Rule Engine, bảng:
-
-```text
-2. QUY TẮC PHÂN GIAO CB (ASSIGNMENT)
-```
-
-Loại luồng và Phòng yêu cầu chọn được, nhưng Cán bộ không chọn được.
-
-Cột Cán bộ ban đầu dùng custom dropdown bằng `<div>`, lấy dữ liệu từ:
-
-```text
-adminConfig.cb_config
-```
-
-và khi click thì set:
-
-```text
-rule.assigned_officers = cb.ID_CB
-```
-
-Về mặt dữ liệu là đúng vì assignment rule nên lưu `ID_CB`, nhưng UI custom dropdown dễ lỗi thao tác hơn `<select>` native.
-
-### 5.3. Nội dung đã xử lý
+### 5.2. Nội dung đã xử lý
 
 ```text
 - Đổi cột Cán bộ trong Assignment Rule sang select native.
@@ -319,7 +295,7 @@ Về mặt dữ liệu là đúng vì assignment rule nên lưu `ID_CB`, nhưng 
 - Sau khi lưu, tab Rule Engine có thể load lại rule đã lưu.
 ```
 
-### 5.4. Lưu ý test/local build
+### 5.3. Lưu ý test/local build
 
 Trong quá trình test, backend đã trả đúng `cb_config`, nhưng giao diện vẫn không có select Cán bộ vì trình duyệt đang dùng bundle cũ/bản build production.
 
@@ -414,27 +390,43 @@ Có thể giảm thêm khoảng cách phụ:
 
 ## 7. Tab Quản trị tự động load mặc định bảng Phân bổ SLA
 
-### 7.1. Vấn đề
+### 7.1. Trạng thái
 
-Trên tab Quản trị, bảng PHÂN BỔ SLA hiện không có thông tin nếu `sla_config` rỗng và cũng không có nút thêm dòng.
-
-Bảng đang render theo:
-
-```vue
-<tr v-for="(sla, idx) in adminConfig.sla_config" :key="'sla'+idx">
+```text
+DONE
 ```
 
-Nếu `adminConfig.sla_config` rỗng thì người dùng không có gì để nhập.
+Đã hoàn thành theo test thực tế: tab Quản trị đã có dữ liệu mặc định trong bảng PHÂN BỔ SLA sau khi restart backend/reload frontend.
 
-### 7.2. Yêu cầu
+### 7.2. Nội dung đã xử lý
 
-Hệ thống phải tự động hiển thị sẵn các tiêu chí mặc định trong bảng Phân bổ SLA, tương tự các cấu hình nền như cán bộ/phòng ban/LĐP-KSV, để người dùng không cần tự thêm thủ công.
+Các file đã sửa:
 
-Không cần thêm nút Thêm nếu backend tự tạo đủ tiêu chí mặc định.
+```text
+backend/modules/smartvcoms/store/config_admin.py
+backend/modules/smartvcoms/services/admin_service.py
+frontend/src/modules/smart-vcoms/components/TabAdminConfig.vue
+```
 
-### 7.3. Danh sách tiêu chí mặc định
+Không sửa:
 
-Cần giữ các key cũ đang được hệ thống yêu cầu:
+```text
+backend/modules/smartvcoms/store/sqlite_reader.py
+```
+
+Logic đã thêm:
+
+```text
+- Thêm ensure_default_sla_config() để ghi các key thiếu vào bảng sla_config trong SQLite.
+- GET /api/vcoms/admin/config luôn gọi nhánh ensure này trước khi trả dữ liệu.
+- Không overwrite giá trị cũ nếu DB đã có.
+- Bảng Phân bổ SLA có empty-state nếu xảy ra lỗi bất thường.
+- Không thêm nút Thêm vì backend tự tạo đủ dòng mặc định.
+```
+
+### 7.3. Key mặc định đã thêm/giữ
+
+Các key mặc định cần có:
 
 ```text
 O1
@@ -442,69 +434,56 @@ O2
 O3
 O5
 O6
-```
-
-Cần có thêm các key đang dùng/đã chốt:
-
-```text
 LC_SLA
 BL_SLA
 DN_PREFIX
-```
-
-Bổ sung nhóm cấu hình thời gian mới:
-
-```text
 WORK_MORNING_START
 WORK_MORNING_END
 WORK_AFTERNOON_START
 WORK_AFTERNOON_END
-
 SLA_MORNING_START
 SLA_MORNING_END
 SLA_AFTERNOON_START
 SLA_AFTERNOON_END
 ```
 
-Giá trị mặc định đề xuất để tương thích hành vi hiện tại:
+Key cũ được giữ nguyên nếu DB đã có:
 
 ```text
-WORK_MORNING_START      = 08:00
-WORK_MORNING_END        = 12:00
-WORK_AFTERNOON_START    = 13:00
-WORK_AFTERNOON_END      = 19:30
-
-SLA_MORNING_START       = 08:00
-SLA_MORNING_END         = 12:00
-SLA_AFTERNOON_START     = 13:00
-SLA_AFTERNOON_END       = 19:30
+O1
+O2
+O3
+O5
+O6
+DN_PREFIX
+LC_SLA
+BL_SLA
 ```
 
-Với các key nghiệp vụ cũ `O1/O2/O3/O5/O6/DN_PREFIX`, ưu tiên giữ default/label hiện có trong code hoặc DB. Nếu chưa có default rõ ràng, tạo dòng mặc định an toàn nhưng không phá logic hiện tại.
-
-### 7.4. Cách xử lý mong muốn
-
-Trong backend, khi gọi:
+Giá trị giờ mặc định để tương thích hành vi hiện tại:
 
 ```text
-GET /api/vcoms/admin/config
+*_MORNING_START = 08:00
+*_MORNING_END = 12:00
+*_AFTERNOON_START = 13:00
+*_AFTERNOON_END = 19:30
 ```
 
-thì `sla_config` trả về luôn có đầy đủ tiêu chí mặc định.
-
-Cần mở rộng logic hiện tại thành hàm chuẩn, ví dụ:
+### 7.4. Test đã chốt
 
 ```text
-ensure_default_sla_config()
+- Mở tab Quản trị và kiểm tra bảng PHÂN BỔ SLA.
+- Phải thấy đủ các dòng mặc định, đặc biệt O1/O2/O3/O5/O6 và các key WORK_*, SLA_*.
+- Sửa 1 giá trị, bấm LƯU, reload trang, kiểm tra giá trị vẫn còn.
+- Nếu DB ban đầu rỗng/thiếu key, vào lại tab Quản trị phải tự sinh đủ dòng.
 ```
 
-Chức năng:
+### 7.5. Lưu ý restart
 
 ```text
-- Kiểm tra các key SLA mặc định.
-- Nếu thiếu thì tạo dòng mặc định.
-- Trả về đầy đủ cho frontend.
-- Nên ghi luôn vào SQLite để lần sau load không bị rỗng.
+- Cần restart backend vì có sửa Python.
+- Nếu frontend chạy dev server/hot reload: chỉ cần refresh trang.
+- Nếu app dùng bundle build sẵn từ dist: cần rebuild frontend rồi reload app.
 ```
 
 ---
@@ -543,26 +522,36 @@ Cần sửa:
 backend/modules/smartvcoms/store/config_admin.py
 ```
 
-Cần sửa:
+Cần sửa còn lại:
 
 ```text
 - fallback sla_minutes không được tính thô
 - sync_config_cb_load_from_case_state() chỉ tính theo ID_CB
 - không cộng name + cb_id
-- bổ sung ensure_default_sla_config() hoặc logic tương đương
+```
+
+Trạng thái đã xong trong file này:
+
+```text
+- ensure_default_sla_config() / default SLA config: DONE
 ```
 
 ```text
 backend/modules/smartvcoms/services/admin_service.py
 ```
 
-Cần sửa:
+Cần sửa còn lại:
 
 ```text
 - Đang xử lý chỉ tính theo ID_CB
 - Tổng SLA chỉ tính theo ID_CB
 - Điểm Phân Giao = Tổng SLA theo ID_CB + Phút Bù Trừ
-- trả về sla_config mặc định nếu thiếu/rỗng
+```
+
+Trạng thái đã xong trong file này:
+
+```text
+- trả về sla_config mặc định nếu thiếu/rỗng: DONE
 ```
 
 ```text
@@ -646,6 +635,16 @@ DONE - đổi custom dropdown cán bộ sang select native, option value = ID_CB
 ```
 
 ```text
+frontend/src/modules/smart-vcoms/components/TabAdminConfig.vue
+```
+
+Trạng thái:
+
+```text
+DONE - bảng Phân bổ SLA tự có tiêu chí mặc định từ backend và có empty-state nếu lỗi bất thường.
+```
+
+```text
 frontend/src/modules/smart-vcoms/pages/SmartVCOMSPage.vue
 ```
 
@@ -653,19 +652,6 @@ Cần sửa:
 
 ```text
 - giảm giãn cách dòng hồ sơ trên Bàn điều phối.
-- kiểm tra load Rule Engine nếu phát sinh lại, nhưng lỗi chọn CB đã hoàn thành.
-```
-
-```text
-frontend/src/modules/smart-vcoms/components/TabAdminConfig.vue
-```
-
-Cần sửa:
-
-```text
-- bảng Phân bổ SLA luôn có tiêu chí mặc định từ backend.
-- nếu vẫn rỗng do lỗi thì hiển thị empty-state phù hợp.
-- không bắt buộc thêm nút Thêm nếu backend tự tạo đủ tiêu chí.
 ```
 
 ---
@@ -756,6 +742,8 @@ Không thay đổi dữ liệu, màu SLA, sort, filter, hoặc thao tác click c
 ### Test 8: Phân bổ SLA tự có dữ liệu mặc định
 
 ```text
+DONE
+
 Vào tab Quản trị.
 Bảng Phân bổ SLA tự hiển thị các tiêu chí mặc định.
 Không cần nút Thêm.
@@ -768,15 +756,14 @@ Các key cũ O1/O2/O3/O5/O6 không bị mất.
 
 ## 11. Ghi chú triển khai
 
-Thứ tự thực hiện tiếp theo sau khi Rule Engine đã hoàn thành:
+Thứ tự thực hiện tiếp theo sau khi Rule Engine và Default SLA Config đã hoàn thành:
 
 ```text
-1. Bổ sung default SLA config để ổn định dữ liệu cấu hình trên tab Quản trị.
-2. Chuẩn hóa ID_CB trong assignment/admin/config/manual override và mapping hiển thị.
-3. Đồng nhất sla_minutes + calendar cấu hình.
-4. Sửa arrival_time theo WAIT_ACCEPT.
-5. Giảm giãn cách dòng Bàn điều phối.
-6. Chạy lại toàn bộ test nghiệm thu ở mục 10.
+1. Chuẩn hóa ID_CB trong assignment/admin/config/manual override và mapping hiển thị.
+2. Đồng nhất sla_minutes + calendar cấu hình.
+3. Sửa arrival_time theo WAIT_ACCEPT.
+4. Giảm giãn cách dòng Bàn điều phối.
+5. Chạy lại toàn bộ test nghiệm thu ở mục 10.
 ```
 
 Lưu ý khi test frontend:
