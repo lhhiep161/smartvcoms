@@ -1,0 +1,10 @@
+{
+  "ad_strict_mapping": {
+    "value": "1",
+    "description": "Bat buoc user AD phai map day du profile noi bo moi duoc dang nhap."
+  },
+  "ma_cb_ad_attribute": {
+    "value": "employeeID",
+    "description": "Thuoc tinh AD uu tien de lay Ma can bo."
+  }
+}

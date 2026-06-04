@@ -1,0 +1,81 @@
+{
+  "admin": {
+    "nameStr": "Admin System",
+    "viTri": "A",
+    "maPhong": "AL",
+    "isAdmin": true,
+    "firstGroup": "Ban Giám Đốc"
+  },
+  "tp_httd": {
+    "nameStr": "Trưởng phòng HTTD",
+    "viTri": "T",
+    "maPhong": "18",
+    "isTruongPhong": true,
+    "isDauMoi": true,
+    "firstGroup": "Phòng HTTD",
+    "userGroups": ["CT928-TP", "CT928-LDP", "ct928-99"],
+    "arrDM": ["HT", "HD", "PH", "CB"]
+  },
+  "cb_httd": {
+    "nameStr": "Cán bộ HTTD",
+    "viTri": "C",
+    "maPhong": "18",
+    "firstGroup": "Phòng HTTD",
+    "userGroups": ["ct928-99"],
+    "arrDM": ["HT", "HD", "PH", "CB"]
+  },
+  "tp_khdn": {
+    "nameStr": "Trưởng phòng KHDN",
+    "viTri": "T",
+    "maPhong": "05",
+    "isTruongPhong": true,
+    "firstGroup": "Phòng KHDN"
+  },
+  "cb_khdn": {
+    "nameStr": "Cán bộ KHDN",
+    "viTri": "C",
+    "maPhong": "05",
+    "firstGroup": "Phòng KHDN"
+  },
+  "tp_pgd": {
+    "nameStr": "Trưởng phòng PGD Hiệp Thành",
+    "viTri": "T",
+    "maPhong": "31",
+    "isTruongPhong": true,
+    "firstGroup": "PGD Hiệp Thành"
+  },
+  "cb_pgd": {
+    "nameStr": "Cán bộ PGD Hiệp Thành",
+    "viTri": "C",
+    "maPhong": "31",
+    "firstGroup": "PGD Hiệp Thành"
+  },
+  "tp_dvkh": {
+    "nameStr": "Trưởng phòng DVKH",
+    "viTri": "T",
+    "maPhong": "03",
+    "isTruongPhong": true,
+    "isDauMoi": true,
+    "firstGroup": "Phòng DVKH"
+  },
+  "cb_dvkh": {
+    "nameStr": "Cán bộ DVKH",
+    "viTri": "C",
+    "maPhong": "03",
+    "firstGroup": "Phòng DVKH"
+  },
+  "tp_tcth": {
+    "nameStr": "Trưởng phòng TCTH",
+    "viTri": "T",
+    "maPhong": "13",
+    "isTruongPhong": true,
+    "isDauMoi": true,
+    "firstGroup": "Phòng TCTH"
+  },
+  "cb_tcth": {
+    "nameStr": "Cán bộ TCTH",
+    "viTri": "C",
+    "maPhong": "13",
+    "firstGroup": "Phòng TCTH"
+  }
+}

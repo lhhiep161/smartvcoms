@@ -1,0 +1,255 @@
+[
+  {
+    "mapping_type": "login_access",
+    "ad_group_name": "ct928",
+    "priority": 10,
+    "notes": "Seed default login access"
+  },
+  {
+    "mapping_type": "login_access",
+    "ad_group_name": "ct928-15",
+    "priority": 11,
+    "notes": "Seed default admin login access"
+  },
+  {
+    "mapping_type": "position",
+    "ad_group_name": "ct928-15",
+    "priority": 100,
+    "position_code": "A",
+    "flag_admin": 1,
+    "flag_bgd": 0,
+    "flag_truong_phong": 0,
+    "flag_lanh_dao_phong": 0,
+    "flag_dau_moi": 0,
+    "notes": "Seed default admin position"
+  },
+  {
+    "mapping_type": "position",
+    "ad_group_name": "ct928-01",
+    "priority": 101,
+    "position_code": "G",
+    "flag_admin": 0,
+    "flag_bgd": 1,
+    "flag_truong_phong": 0,
+    "flag_lanh_dao_phong": 0,
+    "flag_dau_moi": 0,
+    "notes": "Seed default BGD position"
+  },
+  {
+    "mapping_type": "position",
+    "ad_group_name": "CT928-LDP",
+    "priority": 102,
+    "position_code": "P",
+    "flag_admin": 0,
+    "flag_bgd": 0,
+    "flag_truong_phong": 0,
+    "flag_lanh_dao_phong": 1,
+    "flag_dau_moi": 0,
+    "notes": "Seed default LDP position"
+  },
+  {
+    "mapping_type": "position",
+    "ad_group_name": "CT928-TP",
+    "priority": 103,
+    "position_code": "T",
+    "flag_admin": 0,
+    "flag_bgd": 0,
+    "flag_truong_phong": 1,
+    "flag_lanh_dao_phong": 0,
+    "flag_dau_moi": 0,
+    "notes": "Seed default TP position"
+  },
+  {
+    "mapping_type": "department",
+    "ad_group_name": "ct928-15",
+    "priority": 200,
+    "department_code": "AL",
+    "department_name": "Admin",
+    "first_group": "Admin",
+    "arr_dm": "",
+    "flag_admin": 1,
+    "flag_bgd": 0,
+    "notes": "Seed default department ADMIN"
+  },
+  {
+    "mapping_type": "department",
+    "ad_group_name": "ct928-01",
+    "priority": 201,
+    "department_code": "AL",
+    "department_name": "Ban Giam doc",
+    "first_group": "Ban Giam doc",
+    "arr_dm": "",
+    "flag_admin": 0,
+    "flag_bgd": 1,
+    "notes": "Seed default department BGD"
+  },
+  {
+    "mapping_type": "department",
+    "ad_group_name": "ct928-08",
+    "priority": 202,
+    "department_code": "30",
+    "department_name": "PGD An Nhon",
+    "first_group": "PGD An Nhon",
+    "arr_dm": "PH;CB",
+    "flag_admin": 0,
+    "flag_bgd": 0,
+    "notes": "Seed default department PGD_AN_NHON"
+  },
+  {
+    "mapping_type": "department",
+    "ad_group_name": "ct928-17",
+    "priority": 203,
+    "department_code": "35",
+    "department_name": "PGD Cay Tram",
+    "first_group": "PGD Cay Tram",
+    "arr_dm": "PH;CB",
+    "flag_admin": 0,
+    "flag_bgd": 0,
+    "notes": "Seed default department PGD_CAY_TRAM"
+  },
+  {
+    "mapping_type": "department",
+    "ad_group_name": "ct928-13",
+    "priority": 204,
+    "department_code": "37",
+    "department_name": "PGD Go Vap",
+    "first_group": "PGD Go Vap",
+    "arr_dm": "PH;CB",
+    "flag_admin": 0,
+    "flag_bgd": 0,
+    "notes": "Seed default department PGD_GO_VAP"
+  },
+  {
+    "mapping_type": "department",
+    "ad_group_name": "ct928-18",
+    "priority": 205,
+    "department_code": "36",
+    "department_name": "PGD Hanh Thong Tay",
+    "first_group": "PGD Hanh Thong Tay",
+    "arr_dm": "PH;CB",
+    "flag_admin": 0,
+    "flag_bgd": 0,
+    "notes": "Seed default department PGD_HANH_THONG_TAY"
+  },
+  {
+    "mapping_type": "department",
+    "ad_group_name": "ct928-09",
+    "priority": 206,
+    "department_code": "31",
+    "department_name": "PGD Hiep Thanh",
+    "first_group": "PGD Hiep Thanh",
+    "arr_dm": "PH;CB",
+    "flag_admin": 0,
+    "flag_bgd": 0,
+    "notes": "Seed default department PGD_HIEP_THANH"
+  },
+  {
+    "mapping_type": "department",
+    "ad_group_name": "ct928-04",
+    "priority": 207,
+    "department_code": "09",
+    "department_name": "Phong Ban le",
+    "first_group": "Phong Ban le",
+    "arr_dm": "PH;CB",
+    "flag_admin": 0,
+    "flag_bgd": 0,
+    "notes": "Seed default department PHONG_BAN_LE"
+  },
+  {
+    "mapping_type": "department",
+    "ad_group_name": "ct928-05",
+    "priority": 208,
+    "department_code": "03",
+    "department_name": "Phong DVKH",
+    "first_group": "Phong DVKH",
+    "arr_dm": "HT;DV;PH;CB",
+    "flag_admin": 0,
+    "flag_bgd": 0,
+    "notes": "Seed default department PHONG_DVKH"
+  },
+  {
+    "mapping_type": "department",
+    "ad_group_name": "ct928-99",
+    "priority": 209,
+    "department_code": "18",
+    "department_name": "Phong HTTD",
+    "first_group": "Phong HTTD",
+    "arr_dm": "HT;HD;PH;CB",
+    "flag_admin": 0,
+    "flag_bgd": 0,
+    "notes": "Seed default department PHONG_HTTD"
+  },
+  {
+    "mapping_type": "department",
+    "ad_group_name": "ct928-02",
+    "priority": 210,
+    "department_code": "05",
+    "department_name": "Phong KHDN",
+    "first_group": "Phong KHDN",
+    "arr_dm": "PH;CB",
+    "flag_admin": 0,
+    "flag_bgd": 0,
+    "notes": "Seed default department PHONG_KHDN"
+  },
+  {
+    "mapping_type": "department",
+    "ad_group_name": "ct928-03",
+    "priority": 211,
+    "department_code": "13",
+    "department_name": "Phong TCTH",
+    "first_group": "Phong TCTH",
+    "arr_dm": "TC;HK;PH;CB",
+    "flag_admin": 0,
+    "flag_bgd": 0,
+    "notes": "Seed default department PHONG_TCTH"
+  },
+  {
+    "mapping_type": "function",
+    "ad_group_name": "ct928-99",
+    "priority": 300,
+    "function_code": "HT",
+    "notes": "Seed default function HT"
+  },
+  {
+    "mapping_type": "function",
+    "ad_group_name": "ct928-99",
+    "priority": 301,
+    "function_code": "HD",
+    "notes": "Seed default function HD from HTTD"
+  },
+  {
+    "mapping_type": "function",
+    "ad_group_name": "ct928-05",
+    "priority": 302,
+    "function_code": "HD",
+    "notes": "Seed default function HD from DVKH"
+  },
+  {
+    "mapping_type": "function",
+    "ad_group_name": "ct928-05",
+    "priority": 303,
+    "function_code": "DV",
+    "notes": "Seed default function DV"
+  },
+  {
+    "mapping_type": "function",
+    "ad_group_name": "ct928-03",
+    "priority": 304,
+    "function_code": "TC",
+    "notes": "Seed default function TC"
+  },
+  {
+    "mapping_type": "function",
+    "ad_group_name": "ct928-03",
+    "priority": 305,
+    "function_code": "HK",
+    "notes": "Seed default function HK"
+  },
+  {
+    "mapping_type": "function",
+    "ad_group_name": "ct928-01",
+    "priority": 306,
+    "function_code": "GD",
+    "notes": "Seed default function GD"
+  }
+]

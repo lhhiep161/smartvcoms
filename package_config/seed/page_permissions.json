@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "pages": {
+    "SmartVCOMS": {
+      "label": "Theo doi Giai ngan",
+      "path": "pages/2_SmartVCOMS.py",
+      "enabled": true,
+      "actions": {
+        "view": {
+          "roles": ["A", "G", "P", "D", "C"]
+        }
+      },
+      "parts": {
+        "ban_dieu_phoi": {
+          "view": {
+            "roles": ["A", "G", "P", "D", "C"]
+          }
+        },
+        "thong_ke": {
+          "view": {
+            "roles": ["A", "G", "P", "D", "C"]
+          }
+        },
+        "quan_tri_he_thong": {
+          "view": {
+            "any": [
+              { "flags": ["isAdmin"] },
+              { "roles": ["P"], "rooms": ["18"] },
+              { "users": ["DTLY"] }
+            ]
+          }
+        }
+      }
+    },
+    "PortalAdmin": {
+      "label": "Portal Admin",
+      "path": "/portal-admin",
+      "enabled": true,
+      "actions": {
+        "view": { "allow": false }
+      },
+      "parts": {
+        "overview": { "view": { "allow": false } },
+        "identity_auth": { "view": { "allow": false }, "edit": { "allow": false } },
+        "ad_mappings": { "view": { "allow": false }, "edit": { "allow": false } },
+        "user_overrides": { "view": { "allow": false }, "edit": { "allow": false } },
+        "portal_permissions": { "view": { "allow": false }, "edit": { "allow": false } },
+        "admin_management": { "view": { "allow": false }, "edit": { "allow": false } },
+        "auth_policy": { "view": { "allow": false }, "edit": { "allow": false } }
+      }
+    }
+  }
+}

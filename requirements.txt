@@ -1,0 +1,23 @@
+# Portal CN9 - runtime dependencies
+# Install with: py -m pip install -r requirements.txt
+
+# Core Streamlit web app
+streamlit>=1.49
+pandas>=2.2
+plotly>=5.24
+
+# Excel/CSV processing used by SmartDocs, SmartVCOMS, SmartContract, SmartBI
+openpyxl>=3.1.5
+xlrd>=2.0.1
+XlsxWriter>=3.2.0
+
+# Active Directory / LDAP login mode
+ldap3>=2.9.1
+
+# Optional but recommended for smoother Streamlit file watching on Windows
+watchdog>=6.0.0
+
+# Backend API (FastAPI)
+fastapi>=0.100.0
+uvicorn>=0.23.0
+sqlalchemy>=2.0.0
