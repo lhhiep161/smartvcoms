@@ -462,7 +462,7 @@ def _backfill_missing_arrival_from_family(
     conn: sqlite3.Connection,
     cases: dict[str, dict[str, Any]],
 ) -> None:
-    """Backfill ARRIVAL for progressed cases when ARRIVAL was deduped to sibling case."""
+    """Relink deduped ARRIVAL events to the progressed case without changing arrival_time semantics."""
     if not cases:
         return
     for case_key, case in cases.items():
@@ -522,12 +522,6 @@ def _backfill_missing_arrival_from_family(
                 chosen = prior.iloc[-1]
         if chosen is None:
             chosen = cand.iloc[0]
-
-        arr_ts = pd.to_datetime(chosen["received_time"], errors="coerce")
-        if pd.isna(arr_ts):
-            continue
-        case["arrival_time"] = arr_ts.isoformat()
-        case["arrival_event_count"] = max(int(case.get("arrival_event_count") or 0), 1)
 
         ev_id = int(chosen["id"])
         src_case = str(chosen.get("case_key") or "").strip()
