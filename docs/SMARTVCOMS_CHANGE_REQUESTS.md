@@ -1,9 +1,24 @@
 # SmartVCOMS - Tổng hợp các điểm cần chỉnh sửa
 
 Ngày lập: 04/06/2026  
+Cập nhật gần nhất: 04/06/2026  
 Phạm vi: SmartVCOMS trong repository `lhhiep161/smartvcoms`
 
 Tài liệu này tổng hợp các nội dung cần chỉnh sửa đã chốt. Mục tiêu là sửa đúng phạm vi yêu cầu, không mở rộng sang các logic nghiệp vụ khác nếu không cần thiết.
+
+---
+
+## 0. Trạng thái triển khai
+
+| Nhóm việc | Trạng thái | Ghi chú |
+|---|---:|---|
+| Rule Engine - chọn Cán bộ trong bảng Assignment | DONE | Đã đổi sang select native, lưu ID_CB, bổ sung GET `/api/vcoms/admin/rules`. Khi test local nếu vẫn thấy UI cũ cần build/restart frontend/backend và hard refresh. |
+| Tab Quản trị - tự load mặc định bảng Phân bổ SLA | TODO | Bước tiếp theo nên làm. Cần giữ cả bộ key cũ O1/O2/O3/O5/O6. |
+| Chuẩn hóa ID_CB/Tên CB | TODO | Cần sửa cả backend tính toán và mapping hiển thị. |
+| Đồng nhất `sla_minutes` và cấu hình thời gian làm việc/SLA | TODO | Cần sửa `state_machine.py`, `utils.py`, fallback trong config/admin và phần hiển thị/thống kê nếu bị ảnh hưởng. |
+| Quy định lại `arrival_time` | TODO | Làm sau khi ổn định ID_CB và calendar SLA. Giữ nguyên LC nếu không liên quan. |
+| Giảm giãn cách dòng Bàn điều phối | TODO | Chỉ chỉnh CSS/density, không đổi logic dữ liệu. |
+| Nghiệm thu tổng hợp | TODO | Chạy cuối cùng. |
 
 ---
 
@@ -37,18 +52,28 @@ Cụ thể:
 - Không thay đổi cách đóng/mở hồ sơ hoặc tách case nếu không liên quan.
 ```
 
-### 1.3. Ảnh hưởng cần xử lý
+### 1.3. Ảnh hưởng cần kiểm tra
 
-Sau khi đổi `arrival_time`, các phần đang dùng `arrival_time` để tính SLA/phân giao sẽ hiểu đây là mốc bắt đầu tính:
+Sau khi đổi `arrival_time`, cần kiểm tra các phần đang dùng `arrival_time` để tính/hiển thị:
 
 ```text
 - sla_minutes
 - Tổng SLA
 - Điểm phân giao
 - tải phân giao cán bộ
+- Bàn điều phối/Kanban
+- Thống kê
+- sqlite_reader mapping các cột Hồ sơ đến / Thời gian nhận email
 ```
 
-Điểm cần sửa chính nằm ở `state_machine.py`, nơi hiện đang set `arrival_time` khi nhận event `ARRIVAL` / `LC_REQUEST`.
+Các file có thể bị ảnh hưởng:
+
+```text
+backend/modules/smartvcoms/pipeline/state_machine.py
+backend/modules/smartvcoms/store/sqlite_reader.py
+backend/modules/smartvcoms/services/kanban_service.py
+backend/modules/smartvcoms/services/stats_service.py
+```
 
 ---
 
@@ -84,6 +109,17 @@ Tập trung vào:
 - _calculate_sla_minutes(...)
 - fallback khi sla_minutes bị thiếu
 - các phần tính Tổng SLA / Điểm phân giao dựa trên sla_minutes
+```
+
+Các file có thể bị ảnh hưởng:
+
+```text
+backend/modules/smartvcoms/pipeline/state_machine.py
+backend/modules/smartvcoms/store/config_admin.py
+backend/modules/smartvcoms/utils.py
+backend/modules/smartvcoms/services/kanban_service.py nếu đang tính thời gian hiển thị
+backend/modules/smartvcoms/services/stats_service.py nếu đang tính thống kê thời gian
+backend/modules/smartvcoms/store/sqlite_reader.py nếu đang map arrival_time/sla_minutes ra dashboard
 ```
 
 ---
@@ -224,11 +260,31 @@ ID_CB -> Tên Cán bộ
 
 Không dùng tên cán bộ làm khóa xử lý nội bộ.
 
+### 4.6. File/khu vực có thể bị ảnh hưởng
+
+```text
+backend/modules/smartvcoms/pipeline/state_machine.py
+backend/modules/smartvcoms/pipeline/assignment.py
+backend/modules/smartvcoms/store/config_admin.py
+backend/modules/smartvcoms/services/admin_service.py
+backend/modules/smartvcoms/services/actions_service.py
+backend/modules/smartvcoms/services/kanban_service.py nếu cần mapping hiển thị ID_CB -> Tên CB
+backend/modules/smartvcoms/store/sqlite_reader.py nếu cần đảm bảo dashboard output không làm mất ID_CB
+```
+
 ---
 
 ## 5. Sửa lỗi tab Rule Engine không chọn được Cán bộ
 
-### 5.1. Vấn đề
+### 5.1. Trạng thái
+
+```text
+DONE
+```
+
+Đã hoàn thành theo test thực tế.
+
+### 5.2. Vấn đề ban đầu
 
 Trên tab Rule Engine, bảng:
 
@@ -238,7 +294,7 @@ Trên tab Rule Engine, bảng:
 
 Loại luồng và Phòng yêu cầu chọn được, nhưng Cán bộ không chọn được.
 
-Cột Cán bộ hiện đang dùng custom dropdown bằng `<div>`, lấy dữ liệu từ:
+Cột Cán bộ ban đầu dùng custom dropdown bằng `<div>`, lấy dữ liệu từ:
 
 ```text
 adminConfig.cb_config
@@ -252,67 +308,35 @@ rule.assigned_officers = cb.ID_CB
 
 Về mặt dữ liệu là đúng vì assignment rule nên lưu `ID_CB`, nhưng UI custom dropdown dễ lỗi thao tác hơn `<select>` native.
 
-### 5.2. Yêu cầu sửa frontend
-
-Đổi cột Cán bộ trong Assignment Rule sang `<select>` native.
-
-Logic mong muốn:
-
-```vue
-<select v-model="rule.assigned_officers" class="table-input">
-    <option value="">-- Chọn cán bộ --</option>
-    <option
-        v-for="cb in adminConfig.cb_config"
-        :key="cb.ID_CB"
-        :value="cb.ID_CB"
-    >
-        {{ cb.ID_CB }} - {{ cb['Tên Cán bộ'] }}
-    </option>
-</select>
-```
-
-### 5.3. Quy tắc dữ liệu
+### 5.3. Nội dung đã xử lý
 
 ```text
-rule.assigned_officers = ID_CB
+- Đổi cột Cán bộ trong Assignment Rule sang select native.
+- option value = ID_CB.
+- label = ID_CB - Tên Cán bộ.
+- Không lưu tên cán bộ vào rule.
+- Bổ sung GET /api/vcoms/admin/rules để đọc lại vcoms_routing_rules và vcoms_assignment_rules.
+- Sau khi lưu, tab Rule Engine có thể load lại rule đã lưu.
 ```
 
-Không lưu tên cán bộ vào rule.
+### 5.4. Lưu ý test/local build
 
-### 5.4. Load dữ liệu
+Trong quá trình test, backend đã trả đúng `cb_config`, nhưng giao diện vẫn không có select Cán bộ vì trình duyệt đang dùng bundle cũ/bản build production.
 
-Cần đảm bảo:
+Khi test thay đổi frontend, cần lưu ý:
 
 ```text
-- loadAdminConfig xong trước khi cho chọn CB
-- loadRules xong để hiển thị rule hiện có
+- Nếu chạy Vite dev server: mở đúng http://localhost:5173 và hard refresh.
+- Nếu xem bản build static qua backend: cần chạy npm run build lại frontend, restart backend, rồi hard refresh.
 ```
 
-### 5.5. Bổ sung API GET rules
-
-Frontend đang cần load rules từ:
+Test đúng:
 
 ```text
-GET /api/vcoms/admin/rules
-```
-
-Cần bổ sung endpoint này để đọc dữ liệu từ:
-
-```text
-- vcoms_routing_rules
-- vcoms_assignment_rules
-```
-
-Response mong muốn:
-
-```json
-{
-  "status": "success",
-  "data": {
-    "routing": [],
-    "assignment": []
-  }
-}
+document.querySelectorAll('select') trên tab Rule Engine phải thấy ít nhất 3 select ở một dòng Assignment:
+1. Loại luồng
+2. Phòng yêu cầu
+3. Cán bộ
 ```
 
 ---
@@ -410,11 +434,19 @@ Không cần thêm nút Thêm nếu backend tự tạo đủ tiêu chí mặc đ
 
 ### 7.3. Danh sách tiêu chí mặc định
 
-Giữ các tiêu chí SLA hiện tại đang dùng:
+Cần giữ các key cũ đang được hệ thống yêu cầu:
 
 ```text
 O1
 O2
+O3
+O5
+O6
+```
+
+Cần có thêm các key đang dùng/đã chốt:
+
+```text
 LC_SLA
 BL_SLA
 DN_PREFIX
@@ -447,6 +479,8 @@ SLA_MORNING_END         = 12:00
 SLA_AFTERNOON_START     = 13:00
 SLA_AFTERNOON_END       = 19:30
 ```
+
+Với các key nghiệp vụ cũ `O1/O2/O3/O5/O6/DN_PREFIX`, ưu tiên giữ default/label hiện có trong code hoặc DB. Nếu chưa có default rõ ràng, tạo dòng mặc định an toàn nhưng không phá logic hiện tại.
 
 ### 7.4. Cách xử lý mong muốn
 
@@ -547,22 +581,56 @@ Cần sửa:
 backend/modules/smartvcoms/services/actions_service.py
 ```
 
-Cần sửa/thêm:
+Trạng thái:
 
 ```text
-- load_rule_engine_config()
-- GET rules đọc từ vcoms_routing_rules và vcoms_assignment_rules
-- manual override CB nếu nhập tên hoặc ID thì normalize về ID_CB
+- load_rule_engine_config(): DONE nếu đã được thêm trong bước Rule Engine.
+- GET rules đọc từ vcoms_routing_rules và vcoms_assignment_rules: DONE nếu route đã test thành công.
+- manual override CB nếu nhập tên hoặc ID thì normalize về ID_CB: TODO, làm ở bước chuẩn hóa ID_CB.
 ```
 
 ```text
 backend/modules/smartvcoms/router.py
 ```
 
-Cần thêm:
+Trạng thái:
 
 ```text
-GET /api/vcoms/admin/rules
+GET /api/vcoms/admin/rules: DONE nếu đã test load rule thành công.
+```
+
+```text
+backend/modules/smartvcoms/store/sqlite_reader.py
+```
+
+Cần kiểm tra/sửa:
+
+```text
+- REQUIRED_SLA_KEYS phải giữ bộ key cũ O1/O2/O3/O5/O6 nếu đang dùng.
+- mapping arrival_time sang dashboard sau khi đổi semantics.
+- output dashboard không làm mất ID_CB.
+```
+
+```text
+backend/modules/smartvcoms/services/kanban_service.py
+```
+
+Cần kiểm tra/sửa:
+
+```text
+- mapping ID_CB -> Tên cán bộ để hiển thị nếu cần.
+- không dùng tên cán bộ làm khóa logic.
+- không hiểu sai arrival_time sau khi đổi semantics.
+```
+
+```text
+backend/modules/smartvcoms/services/stats_service.py
+```
+
+Cần kiểm tra/sửa:
+
+```text
+- thống kê thời gian nếu phụ thuộc arrival_time hoặc elapsed minutes.
 ```
 
 ### 8.2. Frontend
@@ -571,13 +639,10 @@ GET /api/vcoms/admin/rules
 frontend/src/modules/smart-vcoms/components/TabRuleEngine.vue
 ```
 
-Cần sửa:
+Trạng thái:
 
 ```text
-- đổi custom dropdown cán bộ sang select native
-- option value = ID_CB
-- label = ID_CB - Tên Cán bộ
-- nếu chưa có cb_config thì hiển thị trạng thái chưa có dữ liệu hoặc đang tải
+DONE - đổi custom dropdown cán bộ sang select native, option value = ID_CB, label = ID_CB - Tên Cán bộ.
 ```
 
 ```text
@@ -587,9 +652,8 @@ frontend/src/modules/smart-vcoms/pages/SmartVCOMSPage.vue
 Cần sửa:
 
 ```text
-- đảm bảo khi vào tab RULE_ENGINE thì loadAdminConfig xong trước hoặc song song an toàn
-- loadRules phải hoạt động với GET endpoint mới
-- giảm giãn cách dòng hồ sơ trên Bàn điều phối
+- giảm giãn cách dòng hồ sơ trên Bàn điều phối.
+- kiểm tra load Rule Engine nếu phát sinh lại, nhưng lỗi chọn CB đã hoàn thành.
 ```
 
 ```text
@@ -599,9 +663,9 @@ frontend/src/modules/smart-vcoms/components/TabAdminConfig.vue
 Cần sửa:
 
 ```text
-- bảng Phân bổ SLA luôn có tiêu chí mặc định từ backend
-- nếu vẫn rỗng do lỗi thì hiển thị empty-state phù hợp
-- không bắt buộc thêm nút Thêm nếu backend tự tạo đủ tiêu chí
+- bảng Phân bổ SLA luôn có tiêu chí mặc định từ backend.
+- nếu vẫn rỗng do lỗi thì hiển thị empty-state phù hợp.
+- không bắt buộc thêm nút Thêm nếu backend tự tạo đủ tiêu chí.
 ```
 
 ---
@@ -671,10 +735,12 @@ Tên CB chỉ dùng để hiển thị.
 ### Test 6: Rule Engine
 
 ```text
+DONE
+
 Tab Rule Engine / Bảng Assignment:
 - Chọn được Loại luồng.
 - Chọn được Phòng yêu cầu.
-- Chọn được Cán bộ bằng dropdown/select.
+- Chọn được Cán bộ bằng select native.
 - Cán bộ lưu xuống DB bằng ID_CB.
 - Reload lại tab vẫn hiển thị rule đã lưu.
 ```
@@ -695,18 +761,27 @@ Bảng Phân bổ SLA tự hiển thị các tiêu chí mặc định.
 Không cần nút Thêm.
 Người dùng có thể chỉnh Giá trị và bấm Lưu.
 Reload lại trang vẫn còn các tiêu chí đã lưu.
+Các key cũ O1/O2/O3/O5/O6 không bị mất.
 ```
 
 ---
 
 ## 11. Ghi chú triển khai
 
-Nên thực hiện theo thứ tự:
+Thứ tự thực hiện tiếp theo sau khi Rule Engine đã hoàn thành:
 
 ```text
-1. Bổ sung default SLA config và GET rules để ổn định dữ liệu cấu hình.
-2. Chuẩn hóa ID_CB trong assignment/admin/config/manual override.
-3. Sửa arrival_time và tính sla_minutes theo calendar cấu hình.
-4. Cập nhật frontend Rule Engine, Admin Config và density Bàn điều phối.
-5. Chạy lại toàn bộ test nghiệm thu ở mục 10.
+1. Bổ sung default SLA config để ổn định dữ liệu cấu hình trên tab Quản trị.
+2. Chuẩn hóa ID_CB trong assignment/admin/config/manual override và mapping hiển thị.
+3. Đồng nhất sla_minutes + calendar cấu hình.
+4. Sửa arrival_time theo WAIT_ACCEPT.
+5. Giảm giãn cách dòng Bàn điều phối.
+6. Chạy lại toàn bộ test nghiệm thu ở mục 10.
+```
+
+Lưu ý khi test frontend:
+
+```text
+- Nếu xem qua Vite dev server: mở đúng http://localhost:5173 và hard refresh.
+- Nếu xem bản static build qua backend: chạy npm run build lại frontend, restart backend, rồi hard refresh.
 ```
