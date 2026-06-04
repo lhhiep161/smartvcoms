@@ -15,6 +15,7 @@ import pandas as pd
 from .assignment import assign_officer, recalculate_config_load, update_last_assigned
 from ..store.config_admin import load_config_cb_from_sqlite
 from ..store.sqlite_store import connect_sqlite, init_schema
+from ..utils import calculate_sla_minutes_common
 
 
 SUBJECT_EVENT_MAP = [
@@ -165,41 +166,7 @@ def _parse_currency(text: str) -> str:
     return "VNĐ"
 
 def _calculate_sla_minutes(arrival_time, sla_deadline, flow_type, sla_cfg_map):
-    flow_up = str(flow_type).upper()
-    if "LC" in flow_up:
-        try: return float(sla_cfg_map.get("LC_SLA", 60.0))
-        except: return 60.0
-    if "BL" in flow_up or "BẢO LÃNH" in flow_up or "BAO LANH" in flow_up:
-        try: return float(sla_cfg_map.get("BL_SLA", 60.0))
-        except: return 60.0
-
-    try: o2_max = float(sla_cfg_map.get("O2", 180.0))
-    except: o2_max = 180.0
-    try: o1_max = float(sla_cfg_map.get("O1", 45.0))
-    except: o1_max = 45.0
-
-    if not arrival_time or pd.isna(arrival_time) or not sla_deadline or pd.isna(sla_deadline):
-        return o1_max if flow_up == "GN_ONLINE_KHCN" else o2_max
-
-    try:
-        arr_dt = pd.to_datetime(arrival_time)
-        dead_dt = pd.to_datetime(sla_deadline)
-        if dead_dt > arr_dt:
-            current = arr_dt
-            diff_mins = 0
-            while current < dead_dt:
-                t = current.time()
-                if ((time(8, 0) <= t < time(12, 0)) or (time(13, 0) <= t < time(19, 30))) and current.weekday() < 5:
-                    diff_mins += 1
-                current += timedelta(minutes=1)
-        else:
-            diff_mins = o2_max
-    except:
-        diff_mins = o2_max
-
-    if flow_up == "GN_ONLINE_KHCN":
-        return float(min(diff_mins, o1_max))
-    return float(min(diff_mins, o2_max))
+    return calculate_sla_minutes_common(arrival_time, sla_deadline, flow_type, sla_cfg_map)
 
 
 def normalize_subject_for_classify(subject: str) -> str:

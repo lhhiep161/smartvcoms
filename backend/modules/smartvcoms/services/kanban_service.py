@@ -6,6 +6,7 @@ import pandas as pd
 
 from backend.modules.smartvcoms.utils import (
     VCOMS_DB_PATH,
+    calc_sla_elapsed_mins,
     calc_real_elapsed_mins,
     init_vcoms_extended_tables,
     parse_excel_datetime,
@@ -102,6 +103,16 @@ def _load_cb_maps() -> tuple[dict, dict]:
         return {}, {}
 
 
+def _load_sla_cfg_map() -> dict:
+    try:
+        conn = sqlite3.connect(VCOMS_DB_PATH)
+        rows = conn.execute("SELECT key, value FROM sla_config").fetchall()
+        conn.close()
+        return {str(key).strip().upper(): str(value).strip() for key, value in rows}
+    except Exception:
+        return {}
+
+
 def _load_active_manual_actions() -> set[str]:
     active = set()
     try:
@@ -190,6 +201,7 @@ def fetch_vcoms_cases(current_user: dict) -> dict:
         room_display_map = _load_room_display_map()
         name_to_id, id_to_name = _load_cb_maps()
         active_manual_actions = _load_active_manual_actions()
+        sla_cfg_map = _load_sla_cfg_map()
         overrides_dict = _load_manual_overrides()
 
         now = datetime.now()
@@ -231,14 +243,14 @@ def fetch_vcoms_cases(current_user: dict) -> dict:
 
             if pd.notna(sla_dt) and current_status != "CLOSED":
                 if sla_dt > now:
-                    mins_left = calc_real_elapsed_mins(now, sla_dt)
+                    mins_left = calc_sla_elapsed_mins(now, sla_dt, sla_cfg_map)
                     time_display = f"- {mins_left}p"
                     if mins_left < 15:
                         sla_status = "WARNING"
                     elif mins_left <= 30:
                         sla_status = "YELLOW"
                 else:
-                    mins_over = calc_real_elapsed_mins(sla_dt, now)
+                    mins_over = calc_sla_elapsed_mins(sla_dt, now, sla_cfg_map)
                     mins_left = -mins_over
                     time_display = f"+ {mins_over}p"
                     sla_status = "DANGER"
@@ -255,11 +267,11 @@ def fetch_vcoms_cases(current_user: dict) -> dict:
 
                 if pd.notna(finish_dt) and pd.notna(sla_dt):
                     if sla_dt >= finish_dt:
-                        diff = int(calc_real_elapsed_mins(finish_dt, sla_dt))
+                        diff = int(calc_sla_elapsed_mins(finish_dt, sla_dt, sla_cfg_map))
                         time_display = f"Sớm {diff}p" if diff > 0 else "Đã xong"
                         sla_status = "SAFE"
                     else:
-                        diff = int(calc_real_elapsed_mins(sla_dt, finish_dt))
+                        diff = int(calc_sla_elapsed_mins(sla_dt, finish_dt, sla_cfg_map))
                         time_display = f"Vượt {diff}p"
                         sla_status = "DANGER"
                 else:
@@ -301,7 +313,7 @@ def fetch_vcoms_cases(current_user: dict) -> dict:
             wait_mins = 0
             stage_label = stage_label_base
             if pd.notna(start_dt_for_wait) and current_status != "CLOSED":
-                wait_mins = int(calc_real_elapsed_mins(start_dt_for_wait, now))
+                wait_mins = int(calc_real_elapsed_mins(start_dt_for_wait, now, sla_cfg_map))
                 stage_label = f"{stage_label_base} ({wait_mins}p)"
 
             khung_gio_bucket = ""
@@ -336,6 +348,7 @@ def fetch_vcoms_cases(current_user: dict) -> dict:
                     mins_gn = calc_real_elapsed_mins(
                         parse_excel_datetime(start_gn),
                         parse_excel_datetime(end_gn),
+                        sla_cfg_map,
                     )
                     if mins_gn <= 15:
                         tg_cho_gn_bucket = "< 15p"

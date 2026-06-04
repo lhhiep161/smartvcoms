@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 
 from .sqlite_store import connect_sqlite, init_schema
+from ..utils import calculate_sla_minutes_common
 
 
 DEFAULT_DN_PREFIX = (
@@ -297,6 +298,11 @@ def _normalize_assigned_officer_series(values: pd.Series, cfg: pd.DataFrame) -> 
     return values.map(_normalize_one)
 
 
+def _load_sla_cfg_map(conn: sqlite3.Connection) -> dict[str, str]:
+    rows = conn.execute("SELECT key, value FROM sla_config").fetchall()
+    return {str(key).strip().upper(): str(value).strip() for key, value in rows}
+
+
 def sync_config_cb_load_from_case_state(
     db_path: str | Path,
     business_date: date | None = None,
@@ -320,7 +326,7 @@ def sync_config_cb_load_from_case_state(
 
             case_df = pd.read_sql_query(
                 """
-                SELECT assigned_officer, current_status, sla_minutes, sla_deadline, arrival_time, last_event_time, business_date
+                SELECT assigned_officer, current_status, sla_minutes, sla_deadline, arrival_time, last_event_time, business_date, flow_type
                 FROM vcoms_case_state
                 WHERE business_date = ?
                 """,
@@ -347,10 +353,16 @@ def sync_config_cb_load_from_case_state(
             case_df["sla_minutes"] = pd.to_numeric(case_df["sla_minutes"], errors="coerce")
             missing_sla = case_df["sla_minutes"].isna()
             if missing_sla.any():
-                dl = pd.to_datetime(case_df["sla_deadline"], errors="coerce")
-                at = pd.to_datetime(case_df["arrival_time"], errors="coerce")
-                derived = (dl - at).dt.total_seconds() / 60.0
-                case_df.loc[missing_sla, "sla_minutes"] = pd.to_numeric(derived, errors="coerce")
+                sla_cfg_map = _load_sla_cfg_map(conn)
+                case_df.loc[missing_sla, "sla_minutes"] = case_df.loc[missing_sla].apply(
+                    lambda row: calculate_sla_minutes_common(
+                        row.get("arrival_time"),
+                        row.get("sla_deadline"),
+                        row.get("flow_type"),
+                        sla_cfg_map,
+                    ),
+                    axis=1,
+                )
             case_df["sla_minutes"] = case_df["sla_minutes"].fillna(0.0)
             case_df["last_event_time"] = pd.to_datetime(case_df["last_event_time"], errors="coerce")
 

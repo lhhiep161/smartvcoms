@@ -7,6 +7,8 @@ import pandas as pd
 VCOMS_DB_PATH = os.getenv("VCOMS_DB_PATH", "runtime_data/smartvcoms/vcoms.db").strip()
 
 _vcoms_tables_init = False
+DEFAULT_WORK_WINDOWS = [(time(8, 0), time(12, 0)), (time(13, 0), time(19, 30))]
+DEFAULT_SLA_WINDOWS = [(time(8, 0), time(12, 0)), (time(13, 0), time(19, 30))]
 
 
 def init_vcoms_extended_tables(db_path):
@@ -50,17 +52,118 @@ def init_vcoms_extended_tables(db_path):
     _vcoms_tables_init = True
 
 
-def calc_real_elapsed_mins(start_dt, end_dt):
-    if pd.isna(start_dt) or pd.isna(end_dt) or start_dt >= end_dt:
+def _coerce_timestamp(value):
+    if pd.isna(value) or value is None:
+        return pd.NaT
+    try:
+        return pd.to_datetime(value, errors="coerce")
+    except Exception:
+        return pd.NaT
+
+
+def _parse_clock(raw_value, default_value: time) -> time:
+    raw = str(raw_value or "").strip()
+    if not raw:
+        return default_value
+    parsed = pd.to_datetime(raw, errors="coerce")
+    if pd.isna(parsed):
+        return default_value
+    ts = pd.Timestamp(parsed)
+    return time(ts.hour, ts.minute, ts.second)
+
+
+def _resolve_calendar_windows(sla_cfg_map: dict | None, calendar_type: str) -> list[tuple[time, time]]:
+    cfg = sla_cfg_map or {}
+    prefix = "SLA" if str(calendar_type).upper() == "SLA" else "WORK"
+    defaults = DEFAULT_SLA_WINDOWS if prefix == "SLA" else DEFAULT_WORK_WINDOWS
+    morning_start = _parse_clock(cfg.get(f"{prefix}_MORNING_START"), defaults[0][0])
+    morning_end = _parse_clock(cfg.get(f"{prefix}_MORNING_END"), defaults[0][1])
+    afternoon_start = _parse_clock(cfg.get(f"{prefix}_AFTERNOON_START"), defaults[1][0])
+    afternoon_end = _parse_clock(cfg.get(f"{prefix}_AFTERNOON_END"), defaults[1][1])
+    windows = []
+    if morning_start < morning_end:
+        windows.append((morning_start, morning_end))
+    if afternoon_start < afternoon_end:
+        windows.append((afternoon_start, afternoon_end))
+    return windows or defaults
+
+
+def _normalize_sla_deadline_date(start_dt, end_dt):
+    start_ts = _coerce_timestamp(start_dt)
+    end_ts = _coerce_timestamp(end_dt)
+    if pd.isna(start_ts) or pd.isna(end_ts):
+        return end_ts
+    if end_ts.date() > start_ts.date():
+        next_day = start_ts.date() + timedelta(days=1)
+        return pd.Timestamp(datetime.combine(next_day, end_ts.time()))
+    return end_ts
+
+
+def calc_calendar_elapsed_mins(start_dt, end_dt, sla_cfg_map: dict | None = None, calendar_type: str = "WORK", normalize_sla_deadline: bool = False):
+    start_ts = _coerce_timestamp(start_dt)
+    end_ts = _coerce_timestamp(end_dt)
+    if pd.isna(start_ts) or pd.isna(end_ts):
         return 0
-    current = start_dt
+    if normalize_sla_deadline:
+        end_ts = _normalize_sla_deadline_date(start_ts, end_ts)
+    if start_ts >= end_ts:
+        return 0
+    current = pd.Timestamp(start_ts).to_pydatetime()
+    end_value = pd.Timestamp(end_ts).to_pydatetime()
     mins = 0
-    while current < end_dt:
-        t = current.time()
-        if ((time(8, 0) <= t < time(12, 0)) or (time(13, 0) <= t < time(19, 30))) and current.weekday() < 5:
+    windows = _resolve_calendar_windows(sla_cfg_map, calendar_type)
+    while current < end_value:
+        current_time = current.time()
+        if current.weekday() < 5 and any(window_start <= current_time < window_end for window_start, window_end in windows):
             mins += 1
         current += timedelta(minutes=1)
     return mins
+
+
+def calc_real_elapsed_mins(start_dt, end_dt, sla_cfg_map: dict | None = None):
+    return calc_calendar_elapsed_mins(start_dt, end_dt, sla_cfg_map=sla_cfg_map, calendar_type="WORK")
+
+
+def calc_sla_elapsed_mins(start_dt, end_dt, sla_cfg_map: dict | None = None):
+    return calc_calendar_elapsed_mins(
+        start_dt,
+        end_dt,
+        sla_cfg_map=sla_cfg_map,
+        calendar_type="SLA",
+        normalize_sla_deadline=True,
+    )
+
+
+def calculate_sla_minutes_common(arrival_time, sla_deadline, flow_type, sla_cfg_map: dict | None = None):
+    flow_up = str(flow_type or "").upper()
+    cfg = sla_cfg_map or {}
+    if "LC" in flow_up:
+        try:
+            return float(cfg.get("LC_SLA", 60.0))
+        except Exception:
+            return 60.0
+    if "BL" in flow_up or "BẢO LÃNH" in flow_up or "BAO LANH" in flow_up:
+        try:
+            return float(cfg.get("BL_SLA", 60.0))
+        except Exception:
+            return 60.0
+
+    try:
+        o2_max = float(cfg.get("O2", 180.0))
+    except Exception:
+        o2_max = 180.0
+    try:
+        o1_max = float(cfg.get("O1", 45.0))
+    except Exception:
+        o1_max = 45.0
+
+    if not arrival_time or pd.isna(arrival_time) or not sla_deadline or pd.isna(sla_deadline):
+        return o1_max if flow_up == "GN_ONLINE_KHCN" else o2_max
+
+    diff_mins = calc_sla_elapsed_mins(arrival_time, sla_deadline, cfg)
+    if flow_up == "GN_ONLINE_KHCN":
+        return float(min(diff_mins, o1_max))
+    return float(min(diff_mins, o2_max))
 
 
 def parse_excel_datetime(value):

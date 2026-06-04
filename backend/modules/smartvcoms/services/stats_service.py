@@ -39,6 +39,16 @@ def _load_room_display_map() -> dict:
         return {}
 
 
+def _load_sla_cfg_map() -> dict:
+    try:
+        conn = sqlite3.connect(VCOMS_DB_PATH)
+        rows = conn.execute("SELECT key, value FROM sla_config").fetchall()
+        conn.close()
+        return {str(key).strip().upper(): str(value).strip() for key, value in rows}
+    except Exception:
+        return {}
+
+
 def _shorten_room(name: str, room_display_map: dict) -> str:
     room_name = str(name).strip()
     upper_name = room_name.upper()
@@ -105,6 +115,7 @@ def load_statistics(
             df_stat, _permission_meta = apply_vcoms_scope(df_stat, current_user, room_col="Phòng")
 
         room_display_map = _load_room_display_map()
+        sla_cfg_map = _load_sla_cfg_map()
         df_stat["room_short"] = df_stat["Phòng"].apply(lambda value: _shorten_room(value, room_display_map))
         if room and str(room).strip() != "":
             df_stat = df_stat[df_stat["room_short"] == str(room).strip()]
@@ -200,7 +211,7 @@ def load_statistics(
             end = row.get("Giải ngân")
             if pd.isna(start) or pd.isna(end) or str(start).strip() == "" or str(end).strip() == "":
                 continue
-            mins = calc_real_elapsed_mins(parse_excel_datetime(start), parse_excel_datetime(end))
+            mins = calc_real_elapsed_mins(parse_excel_datetime(start), parse_excel_datetime(end), sla_cfg_map)
             if mins <= 15:
                 gn_counts["< 15p"] += 1
             elif mins <= 30:
