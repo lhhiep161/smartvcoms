@@ -39,11 +39,23 @@ def recalculate_config_load(config_cb: pd.DataFrame, dashboard_df: pd.DataFrame)
     offset_col = "Phút Bù Trừ"
     score_col = "Điểm Phân Giao"
 
+    officer_col = None
+    sla_col = None
     if "CB HTTD" in dashboard.columns:
-        dashboard["CB HTTD"] = dashboard["CB HTTD"].map(lambda value: _normalize_cb_id(value, cb))
+        officer_col = "CB HTTD"
+    elif "assigned_officer" in dashboard.columns:
+        officer_col = "assigned_officer"
+
+    if "Thời gian SLA" in dashboard.columns:
+        sla_col = "Thời gian SLA"
+    elif "sla_minutes" in dashboard.columns:
+        sla_col = "sla_minutes"
+
+    if officer_col:
+        dashboard[officer_col] = dashboard[officer_col].map(lambda value: _normalize_cb_id(value, cb))
     totals = (
-        dashboard.groupby("CB HTTD", dropna=True)["Thời gian SLA"].sum(min_count=1).fillna(0).to_dict()
-        if "CB HTTD" in dashboard.columns and "Thời gian SLA" in dashboard.columns
+        dashboard.groupby(officer_col, dropna=True)[sla_col].sum(min_count=1).fillna(0).to_dict()
+        if officer_col and sla_col
         else {}
     )
 
@@ -72,7 +84,7 @@ def assign_officer(record: dict[str, Any], dashboard_df: pd.DataFrame, config_cb
     id_col = "ID_CB"
     status_col = "Trạng thái"
 
-    ready = config_cb[config_cb[status_col].astype(str).str.lower() == "ready"].copy()
+    ready = config_cb[config_cb[status_col].astype(str).str.strip().str.lower() == "ready"].copy()
     if ready.empty:
         first = config_cb[id_col].dropna()
         return str(first.iloc[0]) if not first.empty else None

@@ -303,7 +303,7 @@ def _evaluate_assignment(flow: str, room: str, rules: list[dict], cb_cfg: pd.Dat
         if not cb_id: continue
         if not cb_cfg.empty and "ID_CB" in cb_cfg.columns:
             hit = cb_cfg[cb_cfg["ID_CB"].astype(str).str.strip() == cb_id]
-            if not hit.empty and str(hit.iloc[0].get("Trạng thái", "Ready")).strip() == "Ready":
+            if not hit.empty and str(hit.iloc[0].get("Trạng thái", "Ready")).strip().lower() == "ready":
                 return cb_id
     return ""
 
