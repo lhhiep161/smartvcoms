@@ -13,6 +13,33 @@ import numpy as np
 from .sqlite_store import connect_sqlite, init_schema
 
 
+DEFAULT_DN_PREFIX = (
+    "CÔNG TY TNHH MTV, CONG TY TNHH MTV, CTY TNHH MTV, CT TNHH MTV, "
+    "CÔNG TY TNHH, CONG TY TNHH, CTY TNHH, CT TNHH, "
+    "CÔNG TY CỔ PHẦN, CONG TY CO PHAN, CTCP, CÔNG TY CP, CONG TY CP, "
+    "CÔNG TY, CONG TY, CTY, CT, DNTN, DOANH NGHIEP"
+)
+
+DEFAULT_SLA_CONFIG_ROWS = [
+    {"key": "O1", "label": "SLA mặc định rút gọn", "value": "45", "value_type": "text", "source_cell": "O1", "sort_order": 10},
+    {"key": "O2", "label": "SLA tối đa", "value": "180", "value_type": "text", "source_cell": "O2", "sort_order": 20},
+    {"key": "O3", "label": "Hệ số hồ sơ trả lại", "value": "1", "value_type": "text", "source_cell": "O3", "sort_order": 30},
+    {"key": "O5", "label": "Tỷ lệ SLA HTTD", "value": "0.8", "value_type": "text", "source_cell": "O5", "sort_order": 40},
+    {"key": "O6", "label": "Tỷ lệ SLA BGĐ", "value": "0.2", "value_type": "text", "source_cell": "O6", "sort_order": 50},
+    {"key": "LC_SLA", "label": "SLA LC", "value": "60", "value_type": "text", "source_cell": "", "sort_order": 60},
+    {"key": "BL_SLA", "label": "SLA Bảo lãnh", "value": "60", "value_type": "text", "source_cell": "", "sort_order": 70},
+    {"key": "DN_PREFIX", "label": "Tiền tố tên doanh nghiệp", "value": DEFAULT_DN_PREFIX, "value_type": "text", "source_cell": "", "sort_order": 80},
+    {"key": "WORK_MORNING_START", "label": "Giờ làm việc sáng bắt đầu", "value": "08:00", "value_type": "text", "source_cell": "", "sort_order": 90},
+    {"key": "WORK_MORNING_END", "label": "Giờ làm việc sáng kết thúc", "value": "12:00", "value_type": "text", "source_cell": "", "sort_order": 100},
+    {"key": "WORK_AFTERNOON_START", "label": "Giờ làm việc chiều bắt đầu", "value": "13:00", "value_type": "text", "source_cell": "", "sort_order": 110},
+    {"key": "WORK_AFTERNOON_END", "label": "Giờ làm việc chiều kết thúc", "value": "19:30", "value_type": "text", "source_cell": "", "sort_order": 120},
+    {"key": "SLA_MORNING_START", "label": "Giờ SLA sáng bắt đầu", "value": "08:00", "value_type": "text", "source_cell": "", "sort_order": 130},
+    {"key": "SLA_MORNING_END", "label": "Giờ SLA sáng kết thúc", "value": "12:00", "value_type": "text", "source_cell": "", "sort_order": 140},
+    {"key": "SLA_AFTERNOON_START", "label": "Giờ SLA chiều bắt đầu", "value": "13:00", "value_type": "text", "source_cell": "", "sort_order": 150},
+    {"key": "SLA_AFTERNOON_END", "label": "Giờ SLA chiều kết thúc", "value": "19:30", "value_type": "text", "source_cell": "", "sort_order": 160},
+]
+
+
 def _now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
@@ -180,13 +207,94 @@ def load_sla_config_from_sqlite(db_path: str | Path) -> pd.DataFrame:
         conn.close()
 
 
+def ensure_default_sla_config(db_path: str | Path, user: str | None = None) -> int:
+    """Ensure required SLA config keys exist in SQLite without overwriting existing rows."""
+    conn = connect_sqlite(db_path)
+    init_schema(conn)
+    now = _now_iso()
+    changed = 0
+    with conn:
+        existing_rows = pd.read_sql_query(
+            """
+            SELECT key, label, value, value_type, source_cell, sort_order
+            FROM sla_config
+            """,
+            conn,
+        )
+        existing_keys = {
+            str(row.get("key") or "").strip().upper()
+            for _, row in existing_rows.iterrows()
+            if str(row.get("key") or "").strip()
+        }
+
+        for default_row in DEFAULT_SLA_CONFIG_ROWS:
+            key = str(default_row["key"]).strip().upper()
+            if key in existing_keys:
+                continue
+            payload = {
+                "key": default_row["key"],
+                "label": default_row["label"],
+                "value": default_row["value"],
+                "value_type": default_row["value_type"],
+                "source_cell": default_row["source_cell"],
+                "sort_order": default_row["sort_order"],
+            }
+            conn.execute(
+                """
+                INSERT INTO sla_config (key, label, value, value_type, source_cell, sort_order, imported_at, updated_at, updated_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload["key"],
+                    payload["label"],
+                    payload["value"],
+                    payload["value_type"],
+                    payload["source_cell"],
+                    payload["sort_order"],
+                    now,
+                    now,
+                    user or "system",
+                ),
+            )
+            write_config_audit_log(conn, "sla_config", payload["key"], "UPSERT", None, payload, user)
+            changed += 1
+    conn.close()
+    return changed
+
+
 def load_config_for_admin(db_path: str | Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Load all admin config frames from sqlite."""
+    ensure_default_sla_config(db_path)
     return (
         load_config_cb_from_sqlite(db_path, active_only=False),
         load_config_ld_from_sqlite(db_path, active_only=False),
         load_sla_config_from_sqlite(db_path),
     )
+
+
+def _normalize_assigned_officer_series(values: pd.Series, cfg: pd.DataFrame) -> pd.Series:
+    if values.empty or cfg.empty:
+        return values.astype(str).str.strip()
+    id_map = {}
+    name_map = {}
+    for _, row in cfg.iterrows():
+        cb_id = str(row.get("id_cb") or row.get("ID_CB") or "").strip()
+        cb_name = str(row.get("ten_can_bo") or row.get("Tên Cán bộ") or "").strip()
+        if cb_id:
+            id_map[cb_id.upper()] = cb_id
+        if cb_name and cb_id:
+            name_map[cb_name.upper()] = cb_id
+    def _normalize_one(value: object) -> str:
+        raw = str(value or "").strip()
+        if not raw:
+            return ""
+        upper = raw.upper()
+        if upper in id_map:
+            return id_map[upper]
+        if upper in name_map:
+            return name_map[upper]
+        return raw
+    return values.map(_normalize_one)
 
 
 def sync_config_cb_load_from_case_state(
@@ -245,6 +353,34 @@ def sync_config_cb_load_from_case_state(
                 case_df.loc[missing_sla, "sla_minutes"] = pd.to_numeric(derived, errors="coerce")
             case_df["sla_minutes"] = case_df["sla_minutes"].fillna(0.0)
             case_df["last_event_time"] = pd.to_datetime(case_df["last_event_time"], errors="coerce")
+
+            cfg = pd.read_sql_query(
+                "SELECT id, id_cb, ten_can_bo, phut_bu_tru FROM config_cb_full",
+                conn,
+            )
+            original_assigned = case_df["assigned_officer"].copy()
+            case_df["assigned_officer"] = _normalize_assigned_officer_series(case_df["assigned_officer"], cfg)
+            normalized_mask = original_assigned != case_df["assigned_officer"]
+            if normalized_mask.any():
+                normalized_rows = case_df.loc[normalized_mask].copy()
+                for _, row in normalized_rows.iterrows():
+                    conn.execute(
+                        """
+                        UPDATE vcoms_case_state
+                           SET assigned_officer = ?,
+                               updated_at = ?,
+                               updated_by = ?
+                         WHERE business_date = ?
+                           AND COALESCE(assigned_officer, '') = ?
+                        """,
+                        (
+                            str(row["assigned_officer"]).strip(),
+                            now,
+                            user or "system",
+                            biz,
+                            str(original_assigned.loc[row.name]).strip(),
+                        ),
+                    )
             open_counts = (
                 case_df[case_df["current_status"].astype(str).str.upper() == "OPEN"]
                 .groupby("assigned_officer")
@@ -253,24 +389,13 @@ def sync_config_cb_load_from_case_state(
             )
             sla_totals = case_df.groupby("assigned_officer")["sla_minutes"].sum().to_dict()
             last_times = case_df.groupby("assigned_officer")["last_event_time"].max().to_dict()
-
-            cfg = pd.read_sql_query(
-                "SELECT id, id_cb, ten_can_bo, phut_bu_tru FROM config_cb_full",
-                conn,
-            )
-            name_to_id = {str(r.get("ten_can_bo") or "").strip(): str(r.get("id_cb") or "").strip() for _, r in cfg.iterrows()}
-            id_to_name = {v: k for k, v in name_to_id.items() if v}
-            case_df["assigned_key"] = case_df["assigned_officer"].map(
-                lambda x: id_to_name.get(str(x).strip(), str(x).strip())
-            )
             for _, r in cfg.iterrows():
-                name = str(r.get("ten_can_bo") or "").strip()
                 cb_id = str(r.get("id_cb") or "").strip()
-                load_open = int(open_counts.get(name, 0) + open_counts.get(cb_id, 0))
-                load_sla = float(sla_totals.get(name, 0.0) + sla_totals.get(cb_id, 0.0))
+                load_open = int(open_counts.get(cb_id, 0))
+                load_sla = float(sla_totals.get(cb_id, 0.0))
                 offset = float(pd.to_numeric(r.get("phut_bu_tru"), errors="coerce") or 0.0)
                 score = load_sla + offset
-                last_ts = last_times.get(name) or last_times.get(cb_id)
+                last_ts = last_times.get(cb_id)
                 conn.execute(
                     """
                     UPDATE config_cb_full

@@ -5,11 +5,13 @@ from datetime import datetime
 from backend.modules.smartvcoms.utils import (
     VCOMS_DB_PATH,
     _ensure_manual_actions_table,
+    init_vcoms_extended_tables,
 )
 
 
 def save_rule_engine_config(routing: list[dict], assignment: list[dict]) -> dict:
     try:
+        init_vcoms_extended_tables(VCOMS_DB_PATH)
         conn = sqlite3.connect(VCOMS_DB_PATH)
         conn.execute("DELETE FROM vcoms_routing_rules")
         for row in routing:
@@ -44,6 +46,52 @@ def save_rule_engine_config(routing: list[dict], assignment: list[dict]) -> dict
         conn.commit()
         conn.close()
         return {"status": "success", "message": "Đã cập nhật Rule Engine thành công."}
+    except Exception as exc:
+        return {"status": "error", "message": str(exc)}
+
+
+def load_rule_engine_config() -> dict:
+    try:
+        init_vcoms_extended_tables(VCOMS_DB_PATH)
+        conn = sqlite3.connect(VCOMS_DB_PATH)
+        routing_rows = conn.execute(
+            """
+            SELECT keyword, flow_type, auto_close_at_stage, is_active
+            FROM vcoms_routing_rules
+            ORDER BY id
+            """
+        ).fetchall()
+        assignment_rows = conn.execute(
+            """
+            SELECT flow_type, room_name, assigned_officers, is_active
+            FROM vcoms_assignment_rules
+            ORDER BY id
+            """
+        ).fetchall()
+        conn.close()
+        return {
+            "status": "success",
+            "data": {
+                "routing": [
+                    {
+                        "keyword": row[0] or "",
+                        "flow_type": row[1] or "",
+                        "auto_close_at_stage": row[2] or "",
+                        "is_active": row[3] if row[3] is not None else 1,
+                    }
+                    for row in routing_rows
+                ],
+                "assignment": [
+                    {
+                        "flow_type": row[0] or "",
+                        "room_name": row[1] or "",
+                        "assigned_officers": row[2] or "",
+                        "is_active": row[3] if row[3] is not None else 1,
+                    }
+                    for row in assignment_rows
+                ],
+            },
+        }
     except Exception as exc:
         return {"status": "error", "message": str(exc)}
 
@@ -174,8 +222,42 @@ def remove_manual_action(case_key: str) -> dict:
         return {"status": "error", "message": str(exc)}
 
 
+def _normalize_cb_input(manual_value: str) -> tuple[str, str]:
+    raw = str(manual_value or "").strip()
+    if not raw:
+        return "", ""
+    try:
+        from ..store.config_admin import load_config_for_admin
+
+        cb_df, _, _ = load_config_for_admin(VCOMS_DB_PATH)
+        if cb_df.empty:
+            return "", ""
+        cb_df = cb_df.copy()
+        cb_df["ID_CB"] = cb_df["ID_CB"].astype(str).str.strip()
+        cb_df["Tên Cán bộ"] = cb_df["Tên Cán bộ"].astype(str).str.strip()
+        hit = cb_df[cb_df["ID_CB"].str.upper() == raw.upper()]
+        if hit.empty:
+            hit = cb_df[cb_df["Tên Cán bộ"].str.upper() == raw.upper()]
+        if hit.empty:
+            return "", ""
+        cb_id = str(hit.iloc[0].get("ID_CB") or "").strip()
+        cb_name = str(hit.iloc[0].get("Tên Cán bộ") or "").strip()
+        return cb_id, cb_name
+    except Exception:
+        return "", ""
+
+
 def set_manual_override(case_key: str, field_name: str, manual_value: str, current_user: dict) -> dict:
     try:
+        normalized_value = str(manual_value or "").strip()
+        audit_note = normalized_value
+        if field_name == "cb_httd":
+            cb_id, cb_name = _normalize_cb_input(manual_value)
+            if not cb_id:
+                return {"status": "error", "message": "Không map được cán bộ sang ID_CB."}
+            normalized_value = cb_id
+            audit_note = f"{cb_id}{' - ' + cb_name if cb_name else ''}"
+
         conn = sqlite3.connect(VCOMS_DB_PATH)
         conn.execute(
             "DELETE FROM vcoms_manual_overrides WHERE case_key = ? AND field_name = ?",
@@ -188,39 +270,24 @@ def set_manual_override(case_key: str, field_name: str, manual_value: str, curre
             INSERT INTO vcoms_manual_overrides (case_key, field_name, manual_value, created_by, created_at)
             VALUES (?, ?, ?, ?, ?)
             """,
-            (case_key, field_name, manual_value, user, now),
+            (case_key, field_name, normalized_value, user, now),
         )
 
         if field_name == "cb_httd":
-            cb_name = manual_value
-            try:
-                from ..store.config_admin import load_config_for_admin
-
-                cb_df, _, _ = load_config_for_admin(VCOMS_DB_PATH)
-                if not cb_df.empty:
-                    hit = cb_df[
-                        cb_df["ID_CB"].astype(str).str.strip().str.upper()
-                        == str(manual_value).strip().upper()
-                    ]
-                    if not hit.empty:
-                        cb_name = str(hit.iloc[0].get("Tên Cán bộ", manual_value)).strip()
-            except Exception:
-                pass
-
             conn.execute(
                 """
                 UPDATE vcoms_case_state
                 SET assigned_officer=?, updated_at=?, updated_by=?
                 WHERE case_key=?
                 """,
-                (cb_name, now, user, case_key),
+                (normalized_value, now, user, case_key),
             )
             conn.execute(
                 """
                 INSERT INTO vcoms_case_audit(case_key, action, old_value, new_value, changed_by, changed_at, note)
                 VALUES(?, 'ADMIN_UPDATE', '', ?, ?, ?, 'Cập nhật cán bộ HTTD')
                 """,
-                (case_key, manual_value, user, now),
+                (case_key, audit_note, user, now),
             )
 
         conn.commit()

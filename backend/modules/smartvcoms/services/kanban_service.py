@@ -75,21 +75,31 @@ def _load_restricted_keywords() -> list[str]:
         return ["KHDN", "BÁN LẺ", "PGD", "PHÒNG GIAO DỊCH"]
 
 
-def _load_name_to_id_map() -> dict:
+def _load_cb_maps() -> tuple[dict, dict]:
     try:
         from ..store.config_admin import load_config_for_admin
 
         cb_df, _, _ = load_config_for_admin(VCOMS_DB_PATH)
         if cb_df.empty:
-            return {}
-        return dict(
+            return {}, {}
+        cb_df = cb_df.copy()
+        cb_df["Tên Cán bộ"] = cb_df["Tên Cán bộ"].astype(str).str.strip()
+        cb_df["ID_CB"] = cb_df["ID_CB"].astype(str).str.strip()
+        name_to_id = dict(
             zip(
-                cb_df["Tên Cán bộ"].astype(str).str.strip().str.upper(),
-                cb_df["ID_CB"].astype(str).str.strip(),
+                cb_df["Tên Cán bộ"].str.upper(),
+                cb_df["ID_CB"],
             )
         )
+        id_to_name = dict(
+            zip(
+                cb_df["ID_CB"].str.upper(),
+                cb_df["Tên Cán bộ"],
+            )
+        )
+        return name_to_id, id_to_name
     except Exception:
-        return {}
+        return {}, {}
 
 
 def _load_active_manual_actions() -> set[str]:
@@ -178,7 +188,7 @@ def fetch_vcoms_cases(current_user: dict) -> dict:
         df_today, _permission_meta = apply_vcoms_scope(df_today, current_user, room_col="Phòng")
 
         room_display_map = _load_room_display_map()
-        name_to_id = _load_name_to_id_map()
+        name_to_id, id_to_name = _load_cb_maps()
         active_manual_actions = _load_active_manual_actions()
         overrides_dict = _load_manual_overrides()
 
@@ -340,8 +350,11 @@ def fetch_vcoms_cases(current_user: dict) -> dict:
 
             case_override = overrides_dict.get(case_key, {})
             customer_name = case_override.get("customer_name", str(row.get("Tên KH", "")).strip())
-            cb_httd_value = str(row.get("CB HTTD", "")).replace("nan", "").strip()
-            cb_httd = case_override.get("cb_httd", cb_httd_value)
+            cb_raw = case_override.get("cb_httd", str(row.get("CB HTTD", "")).replace("nan", "").strip())
+            cb_upper = str(cb_raw or "").strip().upper()
+            cb_id = name_to_id.get(cb_upper, str(cb_raw or "").strip())
+            cb_name = id_to_name.get(cb_upper, str(cb_raw or "").strip()) if cb_upper in id_to_name else id_to_name.get(str(cb_id).upper(), "")
+            cb_display = cb_name or str(cb_raw or "").strip()
 
             cases.append(
                 {
@@ -355,8 +368,8 @@ def fetch_vcoms_cases(current_user: dict) -> dict:
                         "room_short",
                         _shorten_room(str(row.get("Phòng", "")), room_display_map),
                     ),
-                    "cb_httd": cb_httd,
-                    "cb_id": name_to_id.get(cb_httd.upper(), cb_httd),
+                    "cb_httd": cb_display,
+                    "cb_id": cb_id,
                     "ldp_ksv": str(row.get("LDP_KSV", "")).replace("nan", ""),
                     "stage_code": stage_code,
                     "stage_label": case_override.get("stage_label", stage_label),

@@ -156,6 +156,9 @@ const saveAdminSlaConfig = async () => {
                                     <td class="text-left"><input type="text" v-model="sla['Tiêu chí']" class="table-input" style="font-size: 12px; padding: 4px;"></td>
                                     <td><input type="text" v-model="sla['Giá trị']" class="table-input" style="text-align: center; font-size: 12px; padding: 4px;"></td>
                                 </tr>
+                                <tr v-if="adminConfig.sla_config.length === 0">
+                                    <td colspan="2" class="empty-state">Chưa tải được cấu hình SLA mặc định.</td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>

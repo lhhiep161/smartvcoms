@@ -8,6 +8,7 @@ from backend.modules.auth.router import get_current_user
 from backend.modules.smartvcoms.services.actions_service import (
     apply_manual_action,
     delete_manual_override,
+    load_rule_engine_config,
     remove_manual_action,
     save_rule_engine_config,
     set_manual_override,
@@ -56,6 +57,12 @@ def get_vcoms_cases(current_user: dict = Depends(get_current_user)):
 def update_vcoms_rules(req: RuleUpdatePayload, current_user: dict = Depends(get_current_user)):
     assert_permission(current_user, "SmartVCOMS", "view", part_id="quan_tri_he_thong", message="Không có quyền quản trị SmartVCOMS.")
     return save_rule_engine_config(req.routing, req.assignment)
+
+
+@router.get("/admin/rules")
+def get_vcoms_rules(current_user: dict = Depends(get_current_user)):
+    assert_permission(current_user, "SmartVCOMS", "view", part_id="quan_tri_he_thong", message="Không có quyền quản trị SmartVCOMS.")
+    return load_rule_engine_config()
 
 
 @router.post("/manual-action")

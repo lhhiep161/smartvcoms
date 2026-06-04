@@ -314,14 +314,20 @@ def _required_arrival_count(flow_type: str, ldp_count: int) -> int:
     return ldp_count * 2 if "ONLINE" in str(flow_type).upper() else ldp_count
 
 
-def _normalize_officer_name(officer_value: str, cb_cfg: pd.DataFrame) -> str:
+def _normalize_officer_id(officer_value: str, cb_cfg: pd.DataFrame) -> str:
     val = str(officer_value or "").strip()
     if not val or cb_cfg is None or cb_cfg.empty:
         return val
     if "ID_CB" in cb_cfg.columns and "Tên Cán bộ" in cb_cfg.columns:
-        hit = cb_cfg[cb_cfg["ID_CB"].astype(str).str.strip() == val]
+        cb = cb_cfg.copy()
+        cb["ID_CB"] = cb["ID_CB"].astype(str).str.strip()
+        cb["Tên Cán bộ"] = cb["Tên Cán bộ"].astype(str).str.strip()
+        hit = cb[cb["ID_CB"].str.upper() == val.upper()]
         if not hit.empty:
-            return str(hit.iloc[0].get("Tên Cán bộ") or "").strip() or val
+            return str(hit.iloc[0].get("ID_CB") or "").strip() or val
+        hit = cb[cb["Tên Cán bộ"].str.upper() == val.upper()]
+        if not hit.empty:
+            return str(hit.iloc[0].get("ID_CB") or "").strip() or val
     return val
 
 
@@ -937,7 +943,7 @@ def rebuild_from_raw(
                 acc_match = re.search(r"tai khoan[^\d]*(\d{9,15})", body_norm)
             account = acc_match.group(1) if acc_match else ""
             
-            officer = _normalize_officer_name(
+            officer = _normalize_officer_id(
                 _extract(clean_body, [r"Hồ sơ được xử lý bởi cán bộ\s*:\s*([^\n\r]+)", r"bởi cán bộ\s*:\s*([^\n\r]+)", r"cán bộ\s*:\s*([^\n\r]+)"]),
                 cb_cfg,
             )
@@ -1123,7 +1129,7 @@ def rebuild_from_raw(
                     if not assigned:
                         rule_assigned = _evaluate_assignment(flow, room_detected or "", assignment_rules, cb_cfg)
                         if rule_assigned:
-                            assigned = _normalize_officer_name(rule_assigned, cb_cfg)
+                            assigned = _normalize_officer_id(rule_assigned, cb_cfg)
                         else:
                             cb_cfg = recalculate_config_load(cb_cfg, pd.DataFrame([c for c in cases.values()]))
                             suggested = ""
@@ -1132,7 +1138,7 @@ def rebuild_from_raw(
                                 if same_cif:
                                     suggested = str(same_cif[-1].get("assigned_officer") or "")
                             assigned = assign_officer({"cif": cif, "so_tien_gn": amount}, pd.DataFrame([c for c in cases.values()]), cb_cfg, suggested_cb=suggested) or ""
-                            assigned = _normalize_officer_name(assigned, cb_cfg)
+                            assigned = _normalize_officer_id(assigned, cb_cfg)
                         cb_cfg = update_last_assigned(cb_cfg, assigned, received_dt)
 
                     case = {
@@ -1241,7 +1247,7 @@ def rebuild_from_raw(
                     case["current_stage_code"] = "PROCESSING"
                     case["current_stage_label"] = "Đang xử lý"
                     if officer:
-                        case["assigned_officer"] = _normalize_officer_name(officer, cb_cfg)
+                        case["assigned_officer"] = _normalize_officer_id(officer, cb_cfg)
                     if pd.notna(sla_deadline):
                         case["sla_deadline"] = sla_deadline.isoformat()
                         case["sla_minutes"] = _calculate_sla_minutes(

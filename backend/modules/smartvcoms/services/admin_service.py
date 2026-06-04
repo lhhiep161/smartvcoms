@@ -61,11 +61,32 @@ def _enrich_cb_metrics(cb_df: pd.DataFrame, df_state: pd.DataFrame) -> pd.DataFr
     cb_df["ID_CB"] = cb_df["ID_CB"].astype(str).str.strip()
     cb_df["Tên Cán bộ"] = cb_df["Tên Cán bộ"].astype(str).str.strip()
     df_today[cb_col] = df_today[cb_col].astype(str).str.strip()
+    name_to_id = {
+        str(row.get("Tên Cán bộ") or "").strip().upper(): str(row.get("ID_CB") or "").strip()
+        for _, row in cb_df.iterrows()
+        if str(row.get("Tên Cán bộ") or "").strip() and str(row.get("ID_CB") or "").strip()
+    }
+    id_set = {
+        str(row.get("ID_CB") or "").strip().upper()
+        for _, row in cb_df.iterrows()
+        if str(row.get("ID_CB") or "").strip()
+    }
+
+    def _normalize_cb(value: object) -> str:
+        raw = str(value or "").strip()
+        if not raw:
+            return ""
+        upper = raw.upper()
+        if upper in id_set:
+            return raw
+        return name_to_id.get(upper, raw)
+
+    df_today[cb_col] = df_today[cb_col].map(_normalize_cb)
 
     df_open = df_today[df_today[col_trang_thai].astype(str).str.upper() == "OPEN"]
     cb_counts = df_open.groupby(cb_col).size()
     cb_df["Đang xử lý"] = cb_df.apply(
-        lambda row: int(cb_counts.get(row["ID_CB"], 0) + cb_counts.get(row["Tên Cán bộ"], 0)),
+        lambda row: int(cb_counts.get(row["ID_CB"], 0)),
         axis=1,
     )
 
@@ -77,7 +98,7 @@ def _enrich_cb_metrics(cb_df: pd.DataFrame, df_state: pd.DataFrame) -> pd.DataFr
         df_today[sla_col] = pd.to_numeric(df_today[sla_col], errors="coerce").fillna(0)
         cb_sla_sum = df_today.groupby(cb_col)[sla_col].sum()
         cb_df["Tổng phút SLA"] = cb_df.apply(
-            lambda row: float(cb_sla_sum.get(row["ID_CB"], 0.0) + cb_sla_sum.get(row["Tên Cán bộ"], 0.0)),
+            lambda row: float(cb_sla_sum.get(row["ID_CB"], 0.0)),
             axis=1,
         )
 
@@ -89,48 +110,17 @@ def _enrich_cb_metrics(cb_df: pd.DataFrame, df_state: pd.DataFrame) -> pd.DataFr
 def load_admin_config() -> dict:
     init_vcoms_extended_tables(VCOMS_DB_PATH)
     try:
-        from ..store.config_admin import load_config_for_admin
+        from ..store.config_admin import ensure_default_sla_config, load_config_for_admin
         from ..store.sqlite_reader import load_case_state_as_dashboard
 
         try:
+            ensure_default_sla_config(VCOMS_DB_PATH)
             cb_df, ld_df, sla_df = load_config_for_admin(VCOMS_DB_PATH)
             cb_df = cb_df.fillna("") if cb_df is not None else pd.DataFrame()
             ld_df = ld_df.fillna("") if ld_df is not None else pd.DataFrame()
             sla_df = sla_df.fillna("") if sla_df is not None else pd.DataFrame()
-
             if not sla_df.empty:
                 sla_df = sla_df.rename(columns={"label": "Tiêu chí", "value": "Giá trị"})
-                existing_keys = (
-                    sla_df["key"].astype(str).str.strip().str.upper().tolist()
-                    if "key" in sla_df.columns
-                    else []
-                )
-                new_rows = []
-                if "LC_SLA" not in existing_keys:
-                    new_rows.append(
-                        {
-                            "key": "LC_SLA",
-                            "Tiêu chí": "SLA LC",
-                            "Giá trị": "60",
-                            "value_type": "text",
-                            "source_cell": "",
-                            "sort_order": 98,
-                        }
-                    )
-                if "BL_SLA" not in existing_keys:
-                    new_rows.append(
-                        {
-                            "key": "BL_SLA",
-                            "Tiêu chí": "SLA Bảo lãnh",
-                            "Giá trị": "60",
-                            "value_type": "text",
-                            "source_cell": "",
-                            "sort_order": 99,
-                        }
-                    )
-                if new_rows:
-                    sla_df = pd.concat([sla_df, pd.DataFrame(new_rows)], ignore_index=True)
-                    sla_df = sla_df.fillna("")
         except Exception:
             cb_df, ld_df, sla_df = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 

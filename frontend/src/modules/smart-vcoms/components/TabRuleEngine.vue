@@ -2,13 +2,11 @@
 import { ref } from 'vue'
 import { useSmartVCOMS } from '../composables/useSmartVCOMS'
 
-const { ruleConfig, adminConfig, fetchAPI, loadRules } = useSmartVCOMS()
+const { ruleConfig, adminConfig, adminLoading, fetchAPI, loadRules } = useSmartVCOMS()
 const isSavingRules = ref(false)
-const activeDropdown = ref(null)
 
-const toggleDropdown = (idx) => {
-    activeDropdown.value = activeDropdown.value === idx ? null : idx
-}
+const getOfficerId = (cb) => String(cb?.ID_CB ?? cb?.id_cb ?? '').trim()
+const getOfficerName = (cb) => String(cb?.['Tên Cán bộ'] ?? cb?.ten_can_bo ?? '').trim()
 
 const saveRules = async () => {
     isSavingRules.value = true
@@ -97,26 +95,23 @@ const saveRules = async () => {
                                     </select>
                                 </td>
                                 <td>
-                                    <div style="position: relative;">
-                                        <div @click="toggleDropdown(idx)" class="table-input" style="cursor: pointer; min-height: 32px; display: flex; align-items: center; justify-content: space-between; background: #fff;">
-                                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90%; font-size: 13px;">
-                                                {{ rule.assigned_officers ? rule.assigned_officers : '-- Chọn cán bộ --' }}
-                                            </span>
-                                            <span style="font-size: 10px; color: #64748b;">{{ activeDropdown === idx ? '▲' : '▼' }}</span>
-                                        </div>
-                                        <div v-if="activeDropdown === idx" style="margin-top: 5px; background: white; border: 1px solid #005993; border-radius: 4px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); max-height: 200px; overflow-y: auto; text-align: left; position: absolute; z-index: 100; width: 100%;">
-                                            <div v-if="!adminConfig.cb_config || adminConfig.cb_config.length === 0" style="padding: 10px; font-size: 12px; color: #e74c3c; text-align: center; font-style: italic;">
-                                                Chưa có dữ liệu Cán bộ.
-                                            </div>
-                                            <div v-for="cb in adminConfig.cb_config" :key="cb.ID_CB" @click="rule.assigned_officers = cb.ID_CB; activeDropdown = null" style="padding: 8px 10px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 8px; cursor: pointer; background: white;">
-                                                <input type="radio" :name="'cb_radio_' + idx" :value="cb.ID_CB" v-model="rule.assigned_officers" style="cursor: pointer; width: 14px; height: 14px; accent-color: #005993; pointer-events: none; flex-shrink: 0;">
-                                                <span style="margin: 0; font-size: 13px; color: #333; flex: 1; user-select: none;"><b>{{ cb.ID_CB }}</b> - {{ cb['Tên Cán bộ'] }}</span>
-                                            </div>
-                                            <div @click="rule.assigned_officers = ''; activeDropdown = null" style="padding: 8px; text-align: center; border-top: 1px solid #e2e8f0; background: #f8fafc; position: sticky; bottom: 0; cursor: pointer; color: #e74c3c; font-size: 12px; font-weight: bold;">
-                                                ❌ Bỏ chọn
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <select v-model="rule.assigned_officers" class="table-input" :disabled="adminLoading">
+                                        <option value="">-- Chọn cán bộ --</option>
+                                        <option
+                                            v-if="!adminLoading && (!adminConfig.cb_config || adminConfig.cb_config.length === 0)"
+                                            disabled
+                                            value="__empty__"
+                                        >
+                                            Chưa tải được danh sách cán bộ
+                                        </option>
+                                        <option
+                                            v-for="cb in adminConfig.cb_config"
+                                            :key="getOfficerId(cb)"
+                                            :value="getOfficerId(cb)"
+                                        >
+                                            {{ getOfficerId(cb) }} - {{ getOfficerName(cb) }}
+                                        </option>
+                                    </select>
                                 </td>
                                 <td><input type="checkbox" v-model="rule.is_active" :true-value="1" :false-value="0"></td>
                                 <td><button @click="ruleConfig.assignment.splice(idx, 1)" class="input-action-btn" style="color:red; border:none; background: transparent;">🗑️</button></td>
