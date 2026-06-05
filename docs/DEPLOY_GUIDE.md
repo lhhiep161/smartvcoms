@@ -47,7 +47,7 @@ Các biến quan trọng:
 - `PORTAL_DEV_LOGIN_ENABLED`
 - `PORTAL_EMERGENCY_LOGIN_ENABLED`
 - `PORTAL_EMERGENCY_USER`
-- `PORTAL_EMERGENCY_PASSWORD`
+- `PORTAL_EMERGENCY_PASSWORD_HASH`
 - `TODAY_ONLY_STRICT`
 
 File seed AD mapping:
@@ -128,8 +128,26 @@ PORTAL_AUTH_MODE=AD
 PORTAL_DEV_LOGIN_ENABLED=0
 PORTAL_EMERGENCY_LOGIN_ENABLED=1
 PORTAL_EMERGENCY_USER=lh.hiep
-PORTAL_EMERGENCY_PASSWORD=CN928928@@
+PORTAL_EMERGENCY_PASSWORD_HASH=
 ```
+
+Tạo hash emergency password bằng:
+
+```bat
+py tools\generate_emergency_password_hash.py
+```
+
+Script sẽ:
+
+- yêu cầu nhập password 2 lần bằng `getpass`
+- bắt buộc password tối thiểu `12` ký tự
+- chỉ in ra đúng một dòng:
+
+```env
+PORTAL_EMERGENCY_PASSWORD_HASH=pbkdf2_sha256$...
+```
+
+Sao chép dòng này vào `package_config/app.env`.
 
 Sau khi sửa, chạy lại:
 
@@ -176,7 +194,14 @@ Ghi chú:
 - nếu có `AD_SERVICE_USER` và `AD_SERVICE_PASS`, package sẽ bind bằng service account để đọc group/attribute
 - nếu để trống service account, package sẽ bind bằng chính user đăng nhập
 - `AD_AUTH_MODE` hỗ trợ `SIMPLE` và `NTLM`
-- nếu xác thực `AD` lỗi, package chỉ cho phép fallback emergency với đúng user `lh.hiep` và đúng mật khẩu từ `PORTAL_EMERGENCY_PASSWORD`
+- nếu xác thực `AD` lỗi, package chỉ cho phép fallback emergency với đúng user `lh.hiep` và đúng password khớp `PORTAL_EMERGENCY_PASSWORD_HASH`
+
+## 7.1. Lưu ý bảo mật emergency login
+
+- Không commit `package_config/app.env` thật vào Git.
+- Dùng `package_config/app.env.example` làm file mẫu cấu hình.
+- `PORTAL_EMERGENCY_PASSWORD_HASH` là hash một chiều PBKDF2-SHA256 có salt, không lưu plaintext password.
+- Vì emergency password cũ từng tồn tại ở dạng plaintext trong Git, cần đổi emergency password hiện tại trước khi triển khai tiếp.
 
 ## 8. Kết luận triển khai
 

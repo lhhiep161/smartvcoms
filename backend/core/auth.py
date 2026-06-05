@@ -1,11 +1,11 @@
 import json
-import hmac
 import os
 from pathlib import Path
 
 from backend.core.database import PortalSessionLocal
 from backend.core.env_loader import load_app_env
 from backend.core.models import PortalAdminRole, PortalUserProfile
+from backend.core.password_hashing import verify_password
 from backend.core.portal_identity import authenticate_ad_user, get_auth_runtime_config
 
 load_app_env()
@@ -93,12 +93,12 @@ def _build_emergency_user_profile(username: str) -> dict:
 def _try_emergency_login(username: str, password: str) -> dict | None:
     enabled = str(os.environ.get("PORTAL_EMERGENCY_LOGIN_ENABLED", "0")).strip().lower() in {"1", "true", "yes", "on"}
     fallback_user = str(os.environ.get("PORTAL_EMERGENCY_USER", "lh.hiep")).strip().lower()
-    fallback_password = os.environ.get("PORTAL_EMERGENCY_PASSWORD", "")
+    fallback_password_hash = str(os.environ.get("PORTAL_EMERGENCY_PASSWORD_HASH", "")).strip()
     user_key = str(username or "").strip().lower()
     password_text = str(password or "")
-    if not enabled or not fallback_password or user_key != fallback_user:
+    if not enabled or not fallback_password_hash or user_key != fallback_user:
         return None
-    if not hmac.compare_digest(password_text, fallback_password):
+    if not verify_password(password_text, fallback_password_hash):
         return None
     return _build_emergency_user_profile(user_key)
 

@@ -9,6 +9,8 @@ env/
 
 .DS_Store
 
+package_config/app.env
+
 runtime_data/
 *.db
 *.sqlite
