@@ -1,4 +1,6 @@
 from datetime import datetime
+import re
+import unicodedata
 
 import pandas as pd
 
@@ -67,6 +69,23 @@ def _shorten_room(name: str, room_display_map: dict) -> str:
     return room_name
 
 
+def _normalize_room_name(name: str) -> str:
+    value = str(name or "").strip()
+    if not value or value.lower() in {"nan", "none"}:
+        return ""
+
+    value = unicodedata.normalize("NFKD", value)
+    value = "".join(char for char in value if not unicodedata.combining(char))
+    value = re.sub(r"\s+", " ", value).strip().upper()
+
+    for prefix in ("PHONG GIAO DICH ", "PHONG ", "PGD "):
+        if value.startswith(prefix):
+            value = value[len(prefix):].strip()
+            break
+
+    return value
+
+
 def load_statistics(
     mode: str = "today",
     year: int = None,
@@ -117,8 +136,14 @@ def load_statistics(
         room_display_map = _load_room_display_map()
         sla_cfg_map = _load_sla_cfg_map()
         df_stat["room_short"] = df_stat["Phòng"].apply(lambda value: _shorten_room(value, room_display_map))
+        df_stat["room_short_normalized"] = df_stat["room_short"].apply(_normalize_room_name)
+        df_stat["room_raw_normalized"] = df_stat["Phòng"].apply(_normalize_room_name)
         if room and str(room).strip() != "":
-            df_stat = df_stat[df_stat["room_short"] == str(room).strip()]
+            room_normalized = _normalize_room_name(room)
+            df_stat = df_stat[
+                (df_stat["room_short_normalized"] == room_normalized)
+                | (df_stat["room_raw_normalized"] == room_normalized)
+            ]
 
         col_trang_thai = next(
             (col for col in df_stat.columns if str(col).lower() == "trạng thái luồng"),
