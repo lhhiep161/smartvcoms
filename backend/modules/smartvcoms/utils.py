@@ -1,6 +1,7 @@
 import os
 import sqlite3
 from datetime import datetime, time, timedelta
+from pathlib import Path
 
 import pandas as pd
 
@@ -11,11 +12,23 @@ DEFAULT_WORK_WINDOWS = [(time(8, 0), time(12, 0)), (time(13, 0), time(19, 30))]
 DEFAULT_SLA_WINDOWS = [(time(8, 0), time(12, 0)), (time(13, 0), time(19, 30))]
 
 
+def connect_vcoms_sqlite(db_path: str | os.PathLike | None = None) -> sqlite3.Connection:
+    """Open SmartVCOMS SQLite with consistent concurrency pragmas."""
+    db_file = Path(db_path or VCOMS_DB_PATH)
+    db_file.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_file), timeout=10.0)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA busy_timeout=10000;")
+    conn.execute("PRAGMA foreign_keys=ON;")
+    return conn
+
+
 def init_vcoms_extended_tables(db_path):
     global _vcoms_tables_init
     if _vcoms_tables_init or not os.path.exists(db_path):
         return
-    conn = sqlite3.connect(db_path)
+    conn = connect_vcoms_sqlite(db_path)
     conn.execute(
         """CREATE TABLE IF NOT EXISTS vcoms_manual_overrides (
         id INTEGER PRIMARY KEY AUTOINCREMENT, case_key TEXT, field_name TEXT, manual_value TEXT, created_by TEXT, created_at TEXT,
