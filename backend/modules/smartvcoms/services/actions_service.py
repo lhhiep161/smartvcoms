@@ -1,10 +1,10 @@
 import ast
-import sqlite3
 from datetime import datetime
 
 from backend.modules.smartvcoms.utils import (
     VCOMS_DB_PATH,
     _ensure_manual_actions_table,
+    connect_vcoms_sqlite,
     init_vcoms_extended_tables,
 )
 
@@ -12,7 +12,7 @@ from backend.modules.smartvcoms.utils import (
 def save_rule_engine_config(routing: list[dict], assignment: list[dict]) -> dict:
     try:
         init_vcoms_extended_tables(VCOMS_DB_PATH)
-        conn = sqlite3.connect(VCOMS_DB_PATH)
+        conn = connect_vcoms_sqlite(VCOMS_DB_PATH)
         conn.execute("DELETE FROM vcoms_routing_rules")
         for row in routing:
             conn.execute(
@@ -53,7 +53,7 @@ def save_rule_engine_config(routing: list[dict], assignment: list[dict]) -> dict
 def load_rule_engine_config() -> dict:
     try:
         init_vcoms_extended_tables(VCOMS_DB_PATH)
-        conn = sqlite3.connect(VCOMS_DB_PATH)
+        conn = connect_vcoms_sqlite(VCOMS_DB_PATH)
         routing_rows = conn.execute(
             """
             SELECT keyword, flow_type, auto_close_at_stage, is_active
@@ -104,7 +104,7 @@ def apply_manual_action(case_key: str, action_type: str, note: str, current_user
         if action_up not in {"MANUAL_WAIT_DISBURSE", "MANUAL_DONE"}:
             raise ValueError(f"Unsupported action_type: {action_up}")
 
-        conn = sqlite3.connect(VCOMS_DB_PATH)
+        conn = connect_vcoms_sqlite(VCOMS_DB_PATH)
         old = conn.execute(
             """
             SELECT business_date, cif, ma_ho_so, amount, flow_type, current_stage_code
@@ -172,7 +172,7 @@ def apply_manual_action(case_key: str, action_type: str, note: str, current_user
 
 def remove_manual_action(case_key: str) -> dict:
     try:
-        conn = sqlite3.connect(VCOMS_DB_PATH)
+        conn = connect_vcoms_sqlite(VCOMS_DB_PATH)
         conn.execute(
             "UPDATE vcoms_manual_case_actions SET is_active = 0 WHERE case_key = ?",
             (case_key,),
@@ -258,7 +258,7 @@ def set_manual_override(case_key: str, field_name: str, manual_value: str, curre
             normalized_value = cb_id
             audit_note = f"{cb_id}{' - ' + cb_name if cb_name else ''}"
 
-        conn = sqlite3.connect(VCOMS_DB_PATH)
+        conn = connect_vcoms_sqlite(VCOMS_DB_PATH)
         conn.execute(
             "DELETE FROM vcoms_manual_overrides WHERE case_key = ? AND field_name = ?",
             (case_key, field_name),
@@ -299,7 +299,7 @@ def set_manual_override(case_key: str, field_name: str, manual_value: str, curre
 
 def delete_manual_override(case_key: str, field_name: str) -> dict:
     try:
-        conn = sqlite3.connect(VCOMS_DB_PATH)
+        conn = connect_vcoms_sqlite(VCOMS_DB_PATH)
         conn.execute(
             "DELETE FROM vcoms_manual_overrides WHERE case_key = ? AND field_name = ?",
             (case_key, field_name),
