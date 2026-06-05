@@ -604,78 +604,274 @@ const closedCasesPairs = computed(() => {
         <TabRuleEngine />
     </div>
 
-    <div v-if="showCaseDetail" class="modal-overlay" @click.self="showCaseDetail = false">
-        <div class="modal-content" style="max-width: 900px;">
-            <div class="modal-header">
-                <h3>📋 Chi tiết Hồ sơ: {{ selectedCase.cif }}</h3>
-                <button @click="showCaseDetail = false" class="close-btn">×</button>
+    <div v-if="showStatDetailModal" class="modal-overlay" style="z-index: 9999;" @click.self="showStatDetailModal = false">
+        <div class="modal-content" style="width: 95vw; height: 90vh; display: flex; flex-direction: column; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0; color: #005993; text-transform: uppercase;">📋 CHI TIẾT HỒ SƠ ({{ filteredStatCases.length }} HS)</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button @click="exportExcel" style="background: #27ae60; color: white; border: none; font-size: 14px; font-weight: bold; cursor: pointer; padding: 6px 15px; border-radius: 6px;">📥 XUẤT EXCEL</button>
+                    <button @click="showStatDetailModal = false" style="background: #c0392b; color: white; border: none; font-size: 14px; font-weight: bold; cursor: pointer; padding: 6px 15px; border-radius: 6px;">ĐÓNG ❌</button>
+                </div>
             </div>
-            <div class="modal-body" style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div class="detail-section">
-                    <h4>Thông tin hồ sơ</h4>
-                    <p><strong>Khách hàng:</strong> {{ selectedCase.customer_name }}</p>
-                    <p><strong>Số tiền:</strong> {{ formatMoneyFull(selectedCase.amount, selectedCase.currency) }}</p>
-                    <p><strong>Số tài khoản:</strong> {{ selectedCase.stk }}</p>
-                    <p><strong>Phòng:</strong> {{ selectedCase.room_short }}</p>
-                    <p><strong>Trạng thái:</strong> {{ selectedCase.stage_label }}</p>
-                    <p><strong>SLA:</strong> <span :class="selectedCase.sla_status === 'DANGER' ? 'time-red' : 'time-green'">{{ selectedCase.time_display }}</span></p>
-                </div>
-                <div class="edit-section">
-                    <h4>Hiệu chỉnh thủ công</h4>
-                    <div class="form-group">
-                        <label>Cán bộ HTTD:</label>
-                        <div style="display:flex; gap:5px;">
-                            <select v-model="editCaseData.cb_httd" class="table-input">
-                                <option v-for="cb in readyOfficers" :key="cb.ID_CB" :value="cb.ID_CB">{{ cb.ID_CB }} - {{ cb['Tên Cán bộ'] }}</option>
-                            </select>
-                            <button @click="saveOverride('cb_httd', editCaseData.cb_httd)" class="input-action-btn">💾</button>
-                            <button v-if="isOverridden('cb_httd')" @click="removeOverride('cb_httd')" class="input-action-btn">🔓</button>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                <div style="flex: 1.4; position: relative;">
+                    <div @click="toggleStatDropdown('cb')" class="table-input" style="cursor: pointer; background: #fff; min-height: 32px; display: flex; align-items: center; justify-content: space-between;">
+                        <span class="truncate" style="font-size: 13px; font-weight: bold; color: #005993;">
+                            {{ statFilters.cb.length > 0 ? statFilters.cb.join(', ') : 'Cán bộ (Tất cả)' }}
+                        </span>
+                        <span style="font-size: 10px;">{{ activeStatDropdown === 'cb' ? '▲' : '▼' }}</span>
+                    </div>
+                    <div v-if="activeStatDropdown === 'cb'" class="stat-dropdown">
+                        <div v-for="opt in statFilterOptions.cb" :key="opt" class="stat-dropdown-item">
+                            <input type="checkbox" :id="'cb_'+opt" :value="opt" v-model="statFilters.cb">
+                            <label :for="'cb_'+opt">{{ opt }}</label>
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Ghi chú:</label>
-                        <textarea v-model="manualNote" class="table-input" rows="3" placeholder="Nhập lý do thao tác thủ công..."></textarea>
-                    </div>
-                    <div style="margin-top:15px; display:flex; gap:10px; flex-wrap:wrap;">
-                        <button v-if="selectedCase.kanban_column === 'PROCESSING'" @click="doManualAction('MANUAL_WAIT_DISBURSE')" class="btn-primary">➡️ Chuyển Chờ GN</button>
-                        <button v-if="selectedCase.kanban_column !== 'CLOSED'" @click="doManualAction('MANUAL_DONE')" class="btn-success">✅ Hoàn tất thủ công</button>
-                        <button v-if="selectedCase.has_manual_action" @click="undoManualAction" class="btn-warning">↩️ Hủy thao tác thủ công</button>
+                        <div class="stat-dropdown-footer" @click="activeStatDropdown = null">XONG</div>
                     </div>
                 </div>
+                <div style="flex: 1.4; position: relative;">
+                    <div @click="toggleStatDropdown('ldp')" class="table-input" style="cursor: pointer; background: #fff; min-height: 32px; display: flex; align-items: center; justify-content: space-between;">
+                        <span class="truncate" style="font-size: 13px; font-weight: bold; color: #005993;">
+                            {{ statFilters.ldp.length > 0 ? statFilters.ldp.join(', ') : 'LĐP/KSV (Tất cả)' }}
+                        </span>
+                        <span style="font-size: 10px;">{{ activeStatDropdown === 'ldp' ? '▲' : '▼' }}</span>
+                    </div>
+                    <div v-if="activeStatDropdown === 'ldp'" class="stat-dropdown">
+                        <div v-for="opt in statFilterOptions.ldp" :key="opt" class="stat-dropdown-item">
+                            <input type="checkbox" :id="'ldp_'+opt" :value="opt" v-model="statFilters.ldp">
+                            <label :for="'ldp_'+opt">{{ opt }}</label>
+                        </div>
+                        <div class="stat-dropdown-footer" @click="activeStatDropdown = null">XONG</div>
+                    </div>
+                </div>
+                <div style="flex: 1.4; position: relative;">
+                    <div @click="toggleStatDropdown('status')" class="table-input" style="cursor: pointer; background: #fff; min-height: 32px; display: flex; align-items: center; justify-content: space-between;">
+                        <span class="truncate" style="font-size: 13px; font-weight: bold; color: #005993;">
+                            {{ statFilters.status.length > 0 ? statFilters.status.join(', ') : 'Trạng thái (Tất cả)' }}
+                        </span>
+                        <span style="font-size: 10px;">{{ activeStatDropdown === 'status' ? '▲' : '▼' }}</span>
+                    </div>
+                    <div v-if="activeStatDropdown === 'status'" class="stat-dropdown">
+                        <div v-for="opt in statFilterOptions.status" :key="opt" class="stat-dropdown-item">
+                            <input type="checkbox" :id="'st_'+opt" :value="opt" v-model="statFilters.status">
+                            <label :for="'st_'+opt">{{ opt }}</label>
+                        </div>
+                        <div class="stat-dropdown-footer" @click="activeStatDropdown = null">XONG</div>
+                    </div>
+                </div>
+                <div style="flex: 1.4; position: relative;">
+                    <div @click="toggleStatDropdown('room')" class="table-input" style="cursor: pointer; background: #fff; min-height: 32px; display: flex; align-items: center; justify-content: space-between;">
+                        <span class="truncate" style="font-size: 13px; font-weight: bold; color: #005993;">
+                            {{ statFilters.room.length > 0 ? statFilters.room.join(', ') : 'Phòng ban (Tất cả)' }}
+                        </span>
+                        <span style="font-size: 10px;">{{ activeStatDropdown === 'room' ? '▲' : '▼' }}</span>
+                    </div>
+                    <div v-if="activeStatDropdown === 'room'" class="stat-dropdown">
+                        <div v-for="opt in statFilterOptions.room" :key="opt" class="stat-dropdown-item">
+                            <input type="checkbox" :id="'rm_'+opt" :value="opt" v-model="statFilters.room">
+                            <label :for="'rm_'+opt">{{ opt }}</label>
+                        </div>
+                        <div class="stat-dropdown-footer" @click="activeStatDropdown = null">XONG</div>
+                    </div>
+                </div>
+                <div style="flex: 1.8; position: relative;">
+                    <div @click="toggleStatDropdown('progress')" class="table-input" style="cursor: pointer; background: #fff; min-height: 32px; display: flex; align-items: center; justify-content: space-between;">
+                        <span class="truncate" style="font-size: 13px; font-weight: bold; color: #005993;">
+                            {{ statFilters.progress.length > 0 ? statFilters.progress.join(', ') : 'Tiến độ (Tất cả)' }}
+                        </span>
+                        <span style="font-size: 10px;">{{ activeStatDropdown === 'progress' ? '▲' : '▼' }}</span>
+                    </div>
+                    <div v-if="activeStatDropdown === 'progress'" class="stat-dropdown">
+                        <div v-for="opt in statFilterOptions.progress" :key="opt" class="stat-dropdown-item">
+                            <input type="checkbox" :id="'pg_'+opt" :value="opt" v-model="statFilters.progress">
+                            <label :for="'pg_'+opt">{{ opt }}</label>
+                        </div>
+                        <div class="stat-dropdown-footer" @click="activeStatDropdown = null">XONG</div>
+                    </div>
+                </div>
+                <div style="flex: 1.4; position: relative;">
+                    <div @click="toggleStatDropdown('sla')" class="table-input" style="cursor: pointer; background: #fff; min-height: 32px; display: flex; align-items: center; justify-content: space-between;">
+                        <span class="truncate" style="font-size: 13px; font-weight: bold; color: #005993;">
+                            {{ statFilters.sla.length > 0 ? statFilters.sla.join(', ') : 'Thời gian SLA (Tất cả)' }}
+                        </span>
+                        <span style="font-size: 10px;">{{ activeStatDropdown === 'sla' ? '▲' : '▼' }}</span>
+                    </div>
+                    <div v-if="activeStatDropdown === 'sla'" class="stat-dropdown">
+                        <div v-for="opt in statFilterOptions.sla" :key="opt" class="stat-dropdown-item">
+                            <input type="checkbox" :id="'sla_'+opt" :value="opt" v-model="statFilters.sla">
+                            <label :for="'sla_'+opt">{{ opt }}</label>
+                        </div>
+                        <div class="stat-dropdown-footer" @click="activeStatDropdown = null">XONG</div>
+                    </div>
+                </div>
+                <div style="flex: 1.4; position: relative;">
+                    <div @click="toggleStatDropdown('khung_gio')" class="table-input" style="cursor: pointer; background: #fff; min-height: 32px; display: flex; align-items: center; justify-content: space-between;">
+                        <span class="truncate" style="font-size: 13px; font-weight: bold; color: #005993;">
+                            {{ statFilters.khung_gio.length > 0 ? statFilters.khung_gio.join(', ') : 'Khung giờ (Tất cả)' }}
+                        </span>
+                        <span style="font-size: 10px;">{{ activeStatDropdown === 'khung_gio' ? '▲' : '▼' }}</span>
+                    </div>
+                    <div v-if="activeStatDropdown === 'khung_gio'" class="stat-dropdown">
+                        <div v-for="opt in statFilterOptions.khung_gio" :key="opt" class="stat-dropdown-item">
+                            <input type="checkbox" :id="'kg_'+opt" :value="opt" v-model="statFilters.khung_gio">
+                            <label :for="'kg_'+opt">{{ opt }}</label>
+                        </div>
+                        <div class="stat-dropdown-footer" @click="activeStatDropdown = null">XONG</div>
+                    </div>
+                </div>
+                <div style="flex: 1.4; position: relative;">
+                    <div @click="toggleStatDropdown('tg_cho_gn')" class="table-input" style="cursor: pointer; background: #fff; min-height: 32px; display: flex; align-items: center; justify-content: space-between;">
+                        <span class="truncate" style="font-size: 13px; font-weight: bold; color: #005993;">
+                            {{ statFilters.tg_cho_gn.length > 0 ? statFilters.tg_cho_gn.join(', ') : 'TG Giải ngân (Tất cả)' }}
+                        </span>
+                        <span style="font-size: 10px;">{{ activeStatDropdown === 'tg_cho_gn' ? '▲' : '▼' }}</span>
+                    </div>
+                    <div v-if="activeStatDropdown === 'tg_cho_gn'" class="stat-dropdown">
+                        <div v-for="opt in statFilterOptions.tg_cho_gn" :key="opt" class="stat-dropdown-item">
+                            <input type="checkbox" :id="'gn_'+opt" :value="opt" v-model="statFilters.tg_cho_gn">
+                            <label :for="'gn_'+opt">{{ opt }}</label>
+                        </div>
+                        <div class="stat-dropdown-footer" @click="activeStatDropdown = null">XONG</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="kb-scroll" style="flex-grow: 1; border: 1px solid #dce4ed; border-radius: 8px;">
+                <table class="main-table">
+                    <thead style="position: sticky; top: 0; z-index: 10;">
+                        <tr>
+                            <th style="width:3%;">STT</th>
+                            <th style="width:6%;">Hoàn thành</th>
+                            <th style="width:8%;">Phòng</th>
+                            <th style="width:6%;">CIF</th>
+                            <th style="width:23%;" class="text-left">Tên KH</th>
+                            <th style="width:8%;">STK</th>
+                            <th style="width:9%;" class="text-right">Số tiền GN</th>
+                            <th style="width:8%;">CB HTTD</th>
+                            <th style="width:8%;">LĐP/KSV</th>
+                            <th style="width:12%;">Tiến độ</th>
+                            <th style="width:9%;">Thời gian</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(c, idx) in filteredStatCases" :key="c.case_key" class="clickable-row" @click="openCaseDetail(c)">
+                            <td>{{ idx + 1 }}</td>
+                            <td>{{ c.kanban_column === 'CLOSED' ? '✅' : '' }}</td>
+                            <td class="no-wrap">{{ c.room_short }}</td>
+                            <td>{{ c.cif }}</td>
+                            <td class="text-left"><span class="truncate" :title="c.customer_name">{{ smartTruncate(c.customer_name, 50) }}</span></td>
+                            <td>{{ c.stk }}</td>
+                            <td class="text-right">{{ formatMoneyFull(c.amount, c.currency) }}</td>
+                            <td><span class="truncate" :title="c.cb_id || c.cb_httd">{{ c.cb_id || c.cb_httd || '---' }}</span></td>
+                            <td><span class="truncate" :title="c.ldp_ksv">{{ c.ldp_ksv || '---' }}</span></td>
+                            <td><span class="truncate" :title="c.stage_label">{{ c.stage_label }}</span></td>
+                            <td>
+                                <span v-if="c.time_display === 'Đã xong' || c.time_display.startsWith('Sớm')" class="time-green">{{ c.time_display }}</span>
+                                <span v-else-if="c.time_display.startsWith('+') || c.time_display.startsWith('Vượt')" class="time-red">{{ c.time_display }}</span>
+                                <span v-else class="time-orange">{{ c.time_display }}</span>
+                            </td>
+                        </tr>
+                        <tr v-if="filteredStatCases.length === 0"><td colspan="11" class="empty-state">Không có hồ sơ nào khớp điều kiện lọc.</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
-    <div v-if="showStatDetailModal" class="modal-overlay" @click.self="showStatDetailModal = false">
-        <div class="modal-content" style="max-width: 95vw; width: 1200px; max-height: 90vh;">
-            <div class="modal-header">
-                <h3>🔎 Danh sách hồ sơ chi tiết ({{ filteredStatCases.length }})</h3>
-                <div style="display:flex; gap:10px;">
-                    <button @click="exportExcel" class="btn-success">📥 Xuất Excel</button>
-                    <button @click="showStatDetailModal = false" class="close-btn">×</button>
+    <div v-if="showCaseDetail" class="modal-overlay" style="z-index: 10000;" @click.self="showCaseDetail = false">
+        <div class="modal-content" style="width: 650px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                <h2 style="margin: 0; color: #005993;">Chi tiết Hồ sơ</h2>
+                <button @click="showCaseDetail = false" style="background: none; border: none; font-size: 20px; cursor: pointer;">❌</button>
+            </div>
+            <div style="background-color: #e8f4f8; padding: 12px; border-radius: 8px; border-left: 5px solid #005993; margin-bottom: 20px;">
+                <p style="margin: 0; font-weight: bold;">Mã HS: {{ selectedCase.case_key }}</p>
+                <p style="margin: 0; font-size: 13px; color: #666;">Trạng thái hệ thống: {{ selectedCase.stage_code }} | CIF: {{ selectedCase.cif }}</p>
+            </div>
+
+            <div style="font-size: 13px; color: #d35400; margin-bottom: 15px; background: #fff3e0; padding: 10px; border-radius: 6px; border: 1px dashed #f39c12;">
+                💡 Chỉnh sửa thông tin bên dưới và bấm nút 💾 để "Ghi đè" (Khóa dữ liệu).<br> Bấm nút 🔓 để "Mở khóa", hệ thống sẽ tự động cập nhật lại theo luồng máy tính.
+            </div>
+
+            <div v-if="selectedCase.kanban_column === 'PROCESSING' || selectedCase.kanban_column !== 'CLOSED' || selectedCase.has_manual_action" style="margin-bottom: 20px; padding: 15px; background: #fff5f5; border: 1px dashed #ed1c24; border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <h4 style="margin: 0; color: #ed1c24;">⚡ Chuyển trạng thái thẻ Kanban thủ công</h4>
+                    <button v-if="selectedCase.has_manual_action" class="btn" style="background: white; border: 1px solid #c0392b; color: #c0392b; font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: bold; cursor: pointer;" @click="undoManualAction">🔓 HỦY THỦ CÔNG</button>
+                </div>
+                <p style="font-size: 13px; margin-bottom: 10px; color: #666;">Dành cho các hồ sơ cần can thiệp bước hoặc luồng Thông thường/LC.</p>
+                <div style="display: flex; gap: 10px;">
+                    <input v-model="manualNote" type="text" class="table-input" placeholder="Ghi chú (Tùy chọn)..." style="flex: 2;">
+                    <button v-if="selectedCase.kanban_column === 'PROCESSING'" class="btn btn-secondary" style="flex: 1; background: #f39c12; border-color: #f39c12; font-size: 12px; padding: 8px;" @click="doManualAction('MANUAL_WAIT_DISBURSE')">Chuyển sang Chờ GN</button>
+                    <button v-if="selectedCase.kanban_column !== 'CLOSED'" class="btn btn-primary" style="flex: 1; background: #27ae60; border-color: #27ae60; font-size: 12px; padding: 8px;" @click="doManualAction('MANUAL_DONE')">Hoàn tất hồ sơ</button>
                 </div>
             </div>
-            <div style="display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap;">
-                <div v-for="(opts, type) in statFilterOptions" :key="type" class="stat-filter-box">
-                    <button @click="toggleStatDropdown(type)" class="stat-filter-btn">{{ type.toUpperCase() }} ▼</button>
-                    <div v-if="activeStatDropdown === type" class="stat-dropdown">
-                        <div v-for="opt in opts" :key="opt" class="stat-dropdown-item">
-                            <input type="checkbox" :id="type + opt" :value="opt" v-model="statFilters[type]">
-                            <label :for="type + opt">{{ opt }}</label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div style="overflow:auto; max-height: 65vh;">
-                <table class="main-table">
-                    <thead><tr><th>STT</th><th>Trạng thái</th><th>Phòng</th><th>CIF</th><th>Tên KH</th><th>STK</th><th>Số tiền</th><th>CB</th><th>LĐP/KSV</th><th>Tiến độ</th><th>SLA/Time</th></tr></thead>
-                    <tbody>
-                        <tr v-for="(c, idx) in filteredStatCases" :key="c.case_key">
-                            <td>{{ idx + 1 }}</td><td>{{ c.kanban_column === 'CLOSED' ? 'Hoàn thành' : 'Đang xử lý' }}</td><td>{{ c.room_short }}</td><td>{{ c.cif }}</td><td class="text-left">{{ c.customer_name }}</td><td>{{ c.stk }}</td><td class="text-right">{{ formatMoneyFull(c.amount, c.currency) }}</td><td>{{ c.cb_id || c.cb_httd }}</td><td>{{ c.ldp_ksv }}</td><td>{{ c.stage_label }}</td><td>{{ c.time_display }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+
+            <table style="width: 100%; box-shadow: none; border: 1px solid #dce4ed;">
+                <tbody>
+                    <tr>
+                        <td style="width: 30%; font-weight: bold; background: #f8fafc;">Tên Khách hàng</td>
+                        <td>
+                            <div style="display: flex; gap: 5px;">
+                                <input type="text" :value="selectedCase.customer_name" class="table-input" disabled style="background: #e2e8f0; color: #64748b;">
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; background: #f8fafc;">Số tài khoản</td>
+                        <td>
+                            <div style="display: flex; gap: 5px;">
+                                <input type="text" :value="selectedCase.stk || ''" class="table-input" disabled style="background: #e2e8f0; color: #64748b;">
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; background: #f8fafc;">Số tiền GN</td>
+                        <td>
+                            <div style="display: flex; gap: 5px;">
+                                <input type="text" :value="formatMoneyFull(selectedCase.amount, selectedCase.currency)" class="table-input" disabled style="background: #e2e8f0; color: #64748b;">
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; background: #f8fafc;">Phòng</td>
+                        <td>
+                            <div style="display: flex; gap: 5px;">
+                                <input type="text" :value="selectedCase.room_short" class="table-input" disabled style="background: #e2e8f0; color: #64748b;">
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; background: #f8fafc;">Cán bộ HTTD</td>
+                        <td>
+                            <div style="display: flex; gap: 5px;">
+                                <select v-model="editCaseData.cb_httd" class="table-input" :class="{ 'override-input': isOverridden('cb_httd') }">
+                                    <option v-if="!readyOfficers.some(cb => String(cb.ID_CB) === String(selectedCase.cb_id || selectedCase.cb_httd))" :value="String(selectedCase.cb_id || selectedCase.cb_httd || '')">{{ selectedCase.cb_id || selectedCase.cb_httd || 'Chưa phân công' }} (Hiện tại)</option>
+                                    <option v-for="cb in readyOfficers" :key="cb.ID_CB" :value="String(cb.ID_CB)">{{ cb.ID_CB }} - {{ cb['Tên Cán bộ'] }} {{ String(cb.ID_CB) === String(selectedCase.cb_id || selectedCase.cb_httd) ? '(Hiện tại)' : '' }}</option>
+                                </select>
+                                <button v-if="isOverridden('cb_httd') && String(editCaseData.cb_httd) === String(selectedCase.cb_id || selectedCase.cb_httd)" class="input-action-btn" title="Mở khóa" @click="removeOverride('cb_httd')">🔓</button>
+                                <button v-else class="input-action-btn" title="Lưu phân giao thủ công" @click="saveOverride('cb_httd', editCaseData.cb_httd)">💾</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; background: #f8fafc;">LĐP/KSV HTTD</td>
+                        <td>
+                            <div style="display: flex; gap: 5px;">
+                                <input type="text" :value="selectedCase.ldp_ksv || ''" class="table-input" disabled style="background: #e2e8f0; color: #64748b;">
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; background: #f8fafc;">Tiến độ (Nhãn)</td>
+                        <td>
+                            <div style="display: flex; gap: 5px;">
+                                <input type="text" :value="selectedCase.stage_label" class="table-input" disabled style="background: #e2e8f0; color: #64748b;">
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
   </div>
@@ -861,19 +1057,12 @@ const closedCasesPairs = computed(() => {
 .stat-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #005993; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 100; max-height: 250px; overflow-y: auto; margin-top: 2px; }
 .stat-dropdown-item { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .stat-dropdown-item input[type="checkbox"] { cursor: pointer; width: 14px; height: 14px; accent-color: #005993; }
-.stat-dropdown-item label { cursor: pointer; flex: 1; }
-.stat-filter-box { position: relative; }
-.stat-filter-btn { background: #f8fafc; border: 1px solid #dce4ed; color: #005993; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; }
-
+.stat-dropdown-item label { cursor: pointer; margin: 0; font-size: 13px; flex: 1; user-select: none; color: #333; }
+.stat-dropdown-footer { padding: 8px; text-align: center; background: #f8fafc; position: sticky; bottom: 0; cursor: pointer; font-size: 12px; font-weight: bold; color: #005993; border-top: 1px solid #e2e8f0; }
+.stat-dropdown-footer:hover { background: #e2e8f0; }
+.override-input { background-color: #fff3cd !important; border-color: #ffe8a1 !important; color: #b71c1c !important; font-weight: bold; }
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-.modal-content { background: white; border-radius: 12px; padding: 0; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; }
-.modal-header { background: #005993; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
-.modal-header h3 { margin: 0; }
-.close-btn { background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
-.modal-body { padding: 20px; }
-.detail-section, .edit-section { background: #f8fafc; padding: 15px; border-radius: 8px; }
-.form-group { margin-bottom: 12px; }
-.form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: #005993; }
+.modal-content { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; }
 .btn-primary { background: #005993; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600; }
 .btn-success { background: #27ae60; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600; }
 .btn-warning { background: #f39c12; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600; }
