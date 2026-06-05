@@ -1,9 +1,8 @@
-import sqlite3
 from datetime import datetime
 
 import pandas as pd
 
-from backend.modules.smartvcoms.utils import VCOMS_DB_PATH, init_vcoms_extended_tables
+from backend.modules.smartvcoms.utils import VCOMS_DB_PATH, connect_vcoms_sqlite, init_vcoms_extended_tables
 
 
 def _get_record_date(row):
@@ -21,7 +20,7 @@ def _get_record_date(row):
 
 def _load_room_config() -> list[dict]:
     try:
-        conn = sqlite3.connect(VCOMS_DB_PATH)
+        conn = connect_vcoms_sqlite(VCOMS_DB_PATH)
         rows = conn.execute(
             "SELECT id, room_name, is_restricted, display_name FROM vcoms_room_config"
         ).fetchall()
@@ -176,7 +175,7 @@ def update_cb_config(rows: list[dict], current_user: dict) -> dict:
 
 def update_room_config(rows: list[dict]) -> dict:
     try:
-        conn = sqlite3.connect(VCOMS_DB_PATH)
+        conn = connect_vcoms_sqlite(VCOMS_DB_PATH)
         conn.execute("DELETE FROM vcoms_room_config")
         for row in rows:
             if row.get("room_name"):
