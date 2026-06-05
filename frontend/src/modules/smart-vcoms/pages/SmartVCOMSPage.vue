@@ -912,7 +912,7 @@ const closedCasesPairs = computed(() => {
 .vcoms-container { height: calc(100vh - 20px); display: flex; flex-direction: column; overflow: hidden; background: linear-gradient(180deg, #eef8ff 0%, #def6ff 100%); margin: -10px; padding: 12px 14px 12px; }
 .vcoms-header-shell { display: grid; grid-template-columns: minmax(220px, 245px) minmax(0, 1fr); gap: 12px; margin-bottom: 8px; overflow: hidden; }
 .vcoms-header-shell.has-kpi-row { min-height: 151px; max-height: 151px; }
-.vcoms-header-shell.compact-header { min-height: 56px; max-height: 56px; }
+.vcoms-header-shell.compact-header { min-height: 68px; max-height: none; }
 .vcoms-identity-panel { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; padding: 8px 10px 8px 42px; overflow: hidden; text-align: left; }
 .vcoms-header-main { min-width: 0; display: grid; gap: 8px; }
 .vcoms-header-main.has-kpi-row { grid-template-rows: 48px 95px; }
@@ -920,7 +920,7 @@ const closedCasesPairs = computed(() => {
 .vcoms-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding-right: 4px; }
 .vcoms-brand-area { min-width: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px; overflow: hidden; }
 .vcoms-brand-title { font-size: 28px; font-weight: 900; color: #c8102e; line-height: 1; letter-spacing: -0.45px; white-space: nowrap; }
-.vcoms-brand-subtitle { font-size: 15px; font-weight: 700; color: #005993; line-height: 1.12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vcoms-brand-subtitle { font-size: 15px; font-weight: 700; color: #005993; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vcoms-tabs-area { display: flex; align-items: center; justify-content: flex-start; gap: 10px; min-width: 0; overflow: hidden; }
 .vcoms-actions-area { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
 .vcoms-meta-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: rgba(255,255,255,0.82); border: 1px solid #d8e4ef; color: #4b5563; font-size: 13px; box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04); white-space: nowrap; }
