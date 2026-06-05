@@ -272,19 +272,37 @@ Bước 2 đạt về mặt code + compile/build + smoke test chưa đăng nhậ
 
 ---
 
-## 3. Bước 3 - Rà soát quyền thao tác thủ công SmartVCOMS
+## 3. Bước 3 - Chuẩn hóa quyền view tab Quản trị SmartVCOMS
 
-Trạng thái: `DONE / NO CODE CHANGE`  
+Trạng thái: `IMPLEMENTED / NEED CODEX TEST`  
 Mức độ: `MEDIUM/HIGH`  
 Ưu tiên: `3`
 
-### Kết luận sau rà soát
+### Mục tiêu
 
-Không cần tách quyền manual action/manual override thành quyền riêng.
+Giữ nguyên việc manual action/manual override đi theo quyền view tab Quản trị SmartVCOMS, nhưng bỏ hardcode LĐP HTTD / Trưởng phòng HTTD / DTLY khỏi rule mặc định.
 
-Lý do: yêu cầu vận hành đã được chốt là quyền chỉnh sửa/thao tác các nội dung này **đồng nhất với quyền view tab Quản trị SmartVCOMS**.
+### Quy tắc mới
 
-Các endpoint thao tác thủ công hiện đang dùng đúng quyền view của `quan_tri_he_thong`:
+Từ nay quyền:
+
+```text
+SmartVCOMS / quan_tri_he_thong / view
+```
+
+được xác định như sau:
+
+```text
+- isAdmin = True  -> có quyền đương nhiên
+- user khác       -> chỉ có quyền nếu được cấp Portal Admin grant:
+  section_key = SmartVCOMS.quan_tri_he_thong
+  can_view = 1
+  is_active = 1
+```
+
+### Giữ nguyên
+
+Manual action/manual override **vẫn** dùng đúng quyền view của tab Quản trị SmartVCOMS, không tách thành quyền riêng:
 
 ```text
 POST /api/vcoms/manual-action
@@ -293,31 +311,39 @@ POST /api/vcoms/manual-override
 DELETE /api/vcoms/manual-override/{case_key}/{field_name}
 ```
 
-Các endpoint này đang được bảo vệ bằng:
+### Đã thực hiện
+
+Đã bỏ khỏi rule mặc định:
 
 ```text
-SmartVCOMS / quan_tri_he_thong / view
+- {"flags": ["isLanhDaoPhong"], "rooms": ["18"]}
+- {"flags": ["isTruongPhong"], "rooms": ["18"]}
+- {"users": ["DTLY"]}
 ```
 
-### Nhóm user được quyền theo rule hiện tại
-
-Rule hiện tại cho tab Quản trị SmartVCOMS gồm:
+Nếu muốn cấp quyền cho LĐP HTTD / Trưởng phòng HTTD / DTLY hoặc bất kỳ user nào khác, phải thêm grant trong Portal Admin:
 
 ```text
-- Admin
-- LĐP HTTD / phòng 18
-- Trưởng phòng HTTD / phòng 18
-- User chỉ định DTLY
+username = user cần cấp quyền
+section_key = SmartVCOMS.quan_tri_he_thong
+can_view = 1
+is_active = 1
 ```
 
-Ghi chú vận hành: Trưởng phòng HTTD được xem là thuộc nhóm LĐP HTTD, nên có thể giữ rule hiện tại. Không cần sửa code.
-
-### Kết luận hiện tại
+### Cần Codex test
 
 ```text
-Bước 3 hoàn tất dưới dạng rà soát quyền.
-Không có thay đổi code.
-Không cần Codex test riêng ngoài việc tiếp tục build/test ở các bước sau.
+- compile backend
+- build frontend
+- smoke test backend
+- test can() với user giả lập:
+  + Admin -> True
+  + LĐP HTTD chưa grant -> False
+  + Trưởng phòng HTTD chưa grant -> False
+  + DTLY chưa grant -> False
+  + User thường có grant SmartVCOMS.quan_tri_he_thong + can_view=1 -> True
+  + grant can_view=0 -> False
+  + grant inactive -> False
 ```
 
 ---

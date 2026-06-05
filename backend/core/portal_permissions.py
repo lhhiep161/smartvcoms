@@ -76,9 +76,6 @@ def _smartvcoms_admin_rule():
     return {
         "any": [
             {"flags": ["isAdmin"]},
-            {"flags": ["isLanhDaoPhong"], "rooms": ["18"]},
-            {"flags": ["isTruongPhong"], "rooms": ["18"]},
-            {"users": ["DTLY"]},
         ]
     }
 

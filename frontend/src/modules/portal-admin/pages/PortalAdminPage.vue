@@ -52,6 +52,7 @@ const portalAdminGrantSections = [
   'portal_permissions',
   'admin_management',
   'auth_policy',
+  'SmartVCOMS.quan_tri_he_thong',
 ]
 
 const sectionPermissionMap = {

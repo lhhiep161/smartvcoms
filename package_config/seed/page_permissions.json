@@ -24,9 +24,7 @@
         "quan_tri_he_thong": {
           "view": {
             "any": [
-              { "flags": ["isAdmin"] },
-              { "roles": ["P"], "rooms": ["18"] },
-              { "users": ["DTLY"] }
+              { "flags": ["isAdmin"] }
             ]
           }
         }

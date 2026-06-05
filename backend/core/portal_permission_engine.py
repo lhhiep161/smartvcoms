@@ -7,6 +7,8 @@ from backend.core.database import PortalSessionLocal
 from backend.core.models import PortalAdminGrant, PortalAdminRole
 from backend.core.portal_permissions import list_page_permissions
 
+SMARTVCOMS_ADMIN_GRANT_SECTION = "SmartVCOMS.quan_tri_he_thong"
+
 
 def _as_list(value):
     if value is None:
@@ -212,10 +214,26 @@ class PortalPermissionEngine:
             return any(int(row.get("can_edit", 0) or 0) == 1 for row in grants)
         return False
 
+    def _named_grant_allows(self, user, section_key, action="view"):
+        grants = self._portal_admin_grants(user, section_key=section_key)
+        if action == "view":
+            return any(int(row.get("can_view", 0) or 0) == 1 for row in grants)
+        if action == "edit":
+            return any(int(row.get("can_edit", 0) or 0) == 1 for row in grants)
+        return False
+
+    def _smartvcoms_admin_allows(self, user, action="view"):
+        if bool(user.get("isAdmin", False)):
+            return True
+        return self._named_grant_allows(user, SMARTVCOMS_ADMIN_GRANT_SECTION, action=action)
+
     def can(self, user, page_id, action="view", part_id=None):
         page_cfg = self.page_config(page_id)
         if not page_cfg or not page_cfg.get("enabled", True):
             return False
+
+        if page_id == "SmartVCOMS" and part_id == "quan_tri_he_thong":
+            return self._smartvcoms_admin_allows(user, action=action)
 
         if page_id == "PortalAdmin" and self._portal_admin_grant_allows(user, action=action, part_id=part_id):
             return True
