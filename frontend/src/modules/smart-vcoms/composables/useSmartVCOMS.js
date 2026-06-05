@@ -38,6 +38,20 @@ export function useSmartVCOMS() {
         }
     }
 
+    const loadLookupConfig = async () => {
+        adminLoading.value = true
+        try {
+            const res = await fetchAPI('/api/vcoms/lookup/config')
+            if (res.status === 'success') {
+                adminConfig.value = res.data
+            }
+        } catch (e) {
+            console.error("Lỗi tải dữ liệu tra cứu SmartVCOMS:", e)
+        } finally {
+            adminLoading.value = false
+        }
+    }
+
     const loadAdminConfig = async () => {
         adminLoading.value = true
         try {
@@ -84,7 +98,7 @@ export function useSmartVCOMS() {
         token, currentUser, cases, loading, lastUpdate,
         permissionSnapshot,
         adminConfig, adminLoading, ruleConfig, ruleLoading,
-        readyOfficers, fetchAPI, loadCases, loadAdminConfig, loadRules,
+        readyOfficers, fetchAPI, loadCases, loadLookupConfig, loadAdminConfig, loadRules,
         formatMoneyFull, formatMoney 
     }
 }
