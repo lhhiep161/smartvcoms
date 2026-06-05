@@ -97,26 +97,67 @@ onMounted(() => {
 </script>
 
 <template>
-    <div style="display: flex; flex-direction: column; height: 100%; overflow-y: auto; padding-right: 5px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <h3 style="margin: 0; color: #005993; text-transform: uppercase;">📊 THỐNG KÊ HỒ SƠ GIẢI NGÂN</h3>
-                <select v-model="statMode" @change="loadStatistics" class="table-input" style="width: 150px; font-weight: bold; border-radius: 4px; padding: 6px;"><option value="today">Hôm nay</option><option value="custom">Chuyên sâu</option></select>
-                <select v-model="statRoom" @change="loadStatistics" class="table-input" style="width: 150px; font-weight: bold; border-radius: 4px; padding: 6px;"><option value="">Tất cả Phòng</option><option v-for="rm in adminConfig.room_config" :key="rm.room_name" :value="rm.display_name || rm.room_name">{{ rm.display_name || rm.room_name }}</option></select>
+    <div class="statistics-root">
+        <div class="stats-toolbar">
+            <div class="stats-toolbar-title">📊 THỐNG KÊ HỒ SƠ GIẢI NGÂN</div>
+            <div class="stats-filter-group">
+                <div class="stats-segmented">
+                    <button
+                        :class="['stats-segment-btn', statMode === 'today' ? 'active' : '']"
+                        @click="statMode = 'today'; loadStatistics()"
+                    >
+                        Hôm nay
+                    </button>
+                    <button
+                        :class="['stats-segment-btn', statMode === 'custom' ? 'active' : '']"
+                        @click="statMode = 'custom'; loadStatistics()"
+                    >
+                        Chuyên sâu
+                    </button>
+                </div>
+                <select v-model="statRoom" @change="loadStatistics" class="table-input stats-filter-select stats-filter-room"><option value="">Tất cả Phòng</option><option v-for="rm in adminConfig.room_config" :key="rm.room_name" :value="rm.display_name || rm.room_name">{{ rm.display_name || rm.room_name }}</option></select>
             </div>
-            <div v-if="statMode === 'custom'" style="display: flex; gap: 10px;">
-                <select v-model="statYear" @change="loadStatistics" class="table-input" style="width: 100px; border-radius: 4px; padding: 6px;"><option v-for="y in statAvailableYears" :key="y" :value="y">Năm {{y}}</option></select>
-                <select v-model="statMonth" @change="loadStatistics" class="table-input" style="width: 120px; border-radius: 4px; padding: 6px;"><option :value="null">Tất cả tháng</option><option v-for="m in 12" :key="m" :value="m">Tháng {{m}}</option></select>
-                <select v-model="statDay" @change="loadStatistics" class="table-input" style="width: 120px; border-radius: 4px; padding: 6px;"><option :value="null">Tất cả ngày</option><option v-for="d in 31" :key="d" :value="d">Ngày {{d}}</option></select>
+            <div class="stats-toolbar-right">
+                <div v-if="statMode === 'custom'" class="stats-filter-group stats-advanced-filters">
+                    <select v-model="statYear" @change="loadStatistics" class="table-input stats-filter-select stats-filter-year"><option v-for="y in statAvailableYears" :key="y" :value="y">Năm {{y}}</option></select>
+                    <select v-model="statMonth" @change="loadStatistics" class="table-input stats-filter-select stats-filter-month"><option :value="null">Tất cả tháng</option><option v-for="m in 12" :key="m" :value="m">Tháng {{m}}</option></select>
+                    <select v-model="statDay" @change="loadStatistics" class="table-input stats-filter-select stats-filter-day"><option :value="null">Tất cả ngày</option><option v-for="d in 31" :key="d" :value="d">Ngày {{d}}</option></select>
+                </div>
+                <button class="stats-refresh-btn" @click="loadStatistics">🔄 LÀM MỚI</button>
             </div>
-            <button class="btn btn-primary" @click="loadStatistics" style="padding: 6px 15px; background: #005993; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🔄 LÀM MỚI</button>
         </div>
         <div v-if="isStatLoading" style="text-align: center; margin-top: 50px;"><h3 style="color: #005993;">Đang tải dữ liệu thống kê... ⏳</h3></div>
-        <div v-else style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-bottom: 20px;">
-            <div style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 15px; border-top: 4px solid #005993;"><h4 style="text-align: center; color: #005993; margin-top: 0;">SỐ LƯỢNG HS THEO PHÒNG BAN</h4><v-chart class="chart" :option="chartPhongBan" autoresize style="height: 300px;" @click="onChartClick('room', $event)" /></div>
-            <div style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 15px; border-top: 4px solid #005993;"><h4 style="text-align: center; color: #005993; margin-top: 0;">PHỄU TIẾN ĐỘ XỬ LÝ</h4><v-chart class="chart" :option="chartPheu" autoresize style="height: 300px;" @click="onChartClick('progress', $event)" /></div>
-            <div style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 15px; border-top: 4px solid #005993;"><h4 style="text-align: center; color: #005993; margin-top: 0;">LƯU LƯỢNG HỒ SƠ ĐẾN (KHUNG GIỜ)</h4><v-chart class="chart" :option="chartKhungGio" autoresize style="height: 300px;" @click="onChartClick('khung_gio', $event)" /></div>
-            <div style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 15px; border-top: 4px solid #005993;"><h4 style="text-align: center; color: #005993; margin-top: 0;">THỜI GIAN CHỜ GN (TỪ LÚC KÝ SỐ)</h4><v-chart class="chart" :option="chartTGGiaiNgan" autoresize style="height: 300px;" @click="onChartClick('tg_cho_gn', $event)" /></div>
+        <div v-else class="statistics-grid">
+            <div class="statistics-chart-card"><h4 class="statistics-chart-title">SỐ LƯỢNG HS THEO PHÒNG BAN</h4><v-chart class="chart" :option="chartPhongBan" autoresize style="height: 300px;" @click="onChartClick('room', $event)" /></div>
+            <div class="statistics-chart-card"><h4 class="statistics-chart-title">PHỄU TIẾN ĐỘ XỬ LÝ</h4><v-chart class="chart" :option="chartPheu" autoresize style="height: 300px;" @click="onChartClick('progress', $event)" /></div>
+            <div class="statistics-chart-card"><h4 class="statistics-chart-title">LƯU LƯỢNG HỒ SƠ ĐẾN (KHUNG GIỜ)</h4><v-chart class="chart" :option="chartKhungGio" autoresize style="height: 300px;" @click="onChartClick('khung_gio', $event)" /></div>
+            <div class="statistics-chart-card"><h4 class="statistics-chart-title">THỜI GIAN CHỜ GN (TỪ LÚC KÝ SỐ)</h4><v-chart class="chart" :option="chartTGGiaiNgan" autoresize style="height: 300px;" @click="onChartClick('tg_cho_gn', $event)" /></div>
         </div>
     </div>
 </template>
+
+<style scoped>
+.statistics-root { display: flex; flex-direction: column; height: 100%; overflow-y: auto; padding-right: 5px; }
+.stats-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; min-height: 46px; background: rgba(255,255,255,0.96); padding: 6px 12px; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+.stats-toolbar-title { margin: 0; color: #005993; text-transform: uppercase; font-size: 17px; font-weight: 800; line-height: 1.1; white-space: nowrap; }
+.stats-filter-group, .stats-toolbar-right { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.stats-filter-group { flex: 1; }
+.stats-toolbar-right { flex-shrink: 0; }
+.stats-segmented { display: inline-flex; align-items: center; padding: 2px; border-radius: 10px; background: #eaf3fb; border: 1px solid #d2e3f0; box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05); }
+.stats-segment-btn { min-width: 104px; height: 34px; padding: 0 14px; border: none; border-radius: 8px; background: transparent; color: #0f4c81; font-size: 13px; font-weight: 800; cursor: pointer; transition: 0.18s ease; }
+.stats-segment-btn.active { background: linear-gradient(135deg, #005993, #0b6bb0); color: #ffffff; box-shadow: 0 3px 8px rgba(0, 89, 147, 0.18); }
+.stats-filter-select { height: 36px; font-weight: 700; border-radius: 9px; padding: 0 10px; background: #ffffff; border: 1px solid #d8e4ef; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04); color: #005993; }
+.stats-filter-room { width: 154px; }
+.stats-filter-year { width: 100px; }
+.stats-filter-month, .stats-filter-day { width: 118px; }
+.stats-refresh-btn { height: 36px; padding: 0 15px; background: linear-gradient(135deg, #005993, #0b6bb0); color: white; border: none; border-radius: 9px; font-weight: 800; cursor: pointer; white-space: nowrap; box-shadow: 0 3px 8px rgba(0, 89, 147, 0.18); }
+.statistics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-bottom: 20px; }
+.statistics-chart-card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 15px; border-top: 4px solid #005993; }
+.statistics-chart-title { text-align: center; color: #005993; margin-top: 0; }
+
+@media (max-width: 1280px) {
+  .stats-toolbar { flex-wrap: wrap; }
+  .stats-filter-group { flex-wrap: wrap; }
+  .stats-toolbar-right { width: 100%; justify-content: flex-end; }
+}
+</style>

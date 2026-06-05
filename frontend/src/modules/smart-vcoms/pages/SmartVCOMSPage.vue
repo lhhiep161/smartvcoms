@@ -403,14 +403,14 @@ const closedCasesPairs = computed(() => {
 
 <template>
   <div class="vcoms-container">
-    <div class="vcoms-header-shell">
+    <div :class="['vcoms-header-shell', activeTab === 'BAN_DIEU_PHOI' ? 'has-kpi-row' : 'compact-header']">
         <div class="vcoms-identity-panel">
             <div class="vcoms-brand-area">
                 <div class="vcoms-brand-title">SmartVCOMS</div>
                 <div class="vcoms-brand-subtitle">Điều phối &amp; Giám sát SLA</div>
             </div>
         </div>
-        <div class="vcoms-header-main">
+        <div :class="['vcoms-header-main', activeTab === 'BAN_DIEU_PHOI' ? 'has-kpi-row' : 'compact-header']">
             <div class="vcoms-topbar">
                 <div class="vcoms-tabs-area">
                     <button v-if="canViewKanban" :class="['tv-tab', activeTab === 'BAN_DIEU_PHOI' ? 'active' : '']" @click="activeTab = 'BAN_DIEU_PHOI'">📍 BÀN ĐIỀU PHỐI</button>
@@ -582,7 +582,7 @@ const closedCasesPairs = computed(() => {
         </div>
     </div>
 
-    <TabStatistics v-else-if="activeTab === 'THONG_KE'" @open-stat-detail="openStatDetail" />
+    <TabStatistics v-else-if="activeTab === 'THONG_KE'" class="vcoms-statistics-pane" @open-stat-detail="openStatDetail" />
     <TabAdminConfig v-else-if="activeTab === 'QUAN_TRI'" />
     <TabRuleEngine v-else-if="activeTab === 'RULE_ENGINE'" />
 
@@ -884,9 +884,13 @@ const closedCasesPairs = computed(() => {
 .table-input:focus { background: white; border-color: #005993; outline: none; }
 
 .vcoms-container { height: calc(100vh - 20px); display: flex; flex-direction: column; overflow: hidden; background: linear-gradient(180deg, #eef8ff 0%, #def6ff 100%); margin: -10px; padding: 12px 14px 12px; }
-.vcoms-header-shell { display: grid; grid-template-columns: minmax(220px, 245px) minmax(0, 1fr); gap: 12px; min-height: 151px; max-height: 151px; margin-bottom: 8px; overflow: hidden; }
+.vcoms-header-shell { display: grid; grid-template-columns: minmax(220px, 245px) minmax(0, 1fr); gap: 12px; margin-bottom: 8px; overflow: hidden; }
+.vcoms-header-shell.has-kpi-row { min-height: 151px; max-height: 151px; }
+.vcoms-header-shell.compact-header { min-height: 56px; max-height: 56px; }
 .vcoms-identity-panel { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; padding: 8px 10px 8px 42px; overflow: hidden; text-align: left; }
-.vcoms-header-main { min-width: 0; display: grid; grid-template-rows: 48px 95px; gap: 8px; }
+.vcoms-header-main { min-width: 0; display: grid; gap: 8px; }
+.vcoms-header-main.has-kpi-row { grid-template-rows: 48px 95px; }
+.vcoms-header-main.compact-header { grid-template-rows: 48px; }
 .vcoms-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding-right: 4px; }
 .vcoms-brand-area { min-width: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px; overflow: hidden; }
 .vcoms-brand-title { font-size: 28px; font-weight: 900; color: #c8102e; line-height: 1; letter-spacing: -0.45px; white-space: nowrap; }
@@ -903,6 +907,7 @@ const closedCasesPairs = computed(() => {
 .tv-tab.active { background: linear-gradient(135deg, #005993, #0b6bb0); color: white; border-color: transparent; box-shadow: 0 6px 14px rgba(0,89,147,0.18); }
 
 .vcoms-tab-pane { display: flex; flex-direction: column; flex-grow: 1; overflow: hidden; }
+.vcoms-statistics-pane { flex: 1; min-height: 0; }
 .vcoms-kpi-row { display: grid; grid-template-columns: minmax(0, 4fr) minmax(260px, 1.35fr); gap: 12px; height: 95px; max-height: 95px; overflow: hidden; }
 .vcoms-kpi-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; height: 100%; min-width: 0; }
 .kpi-card { height: 100%; min-height: 0; box-sizing: border-box; border: 1px solid rgba(226, 232, 240, 0.9); border-radius: 14px; box-shadow: 0 4px 12px rgba(0, 59, 115, 0.06); padding: 9px 12px; display: grid; grid-template-columns: 42px 1fr; align-items: center; gap: 10px; overflow: hidden; position: relative; }
@@ -1013,9 +1018,10 @@ const closedCasesPairs = computed(() => {
 }
 
 @media (max-width: 1280px) {
-  .vcoms-header-shell { grid-template-columns: minmax(186px, 206px) minmax(0, 1fr); min-height: 151px; max-height: 151px; }
+  .vcoms-header-shell { grid-template-columns: minmax(186px, 206px) minmax(0, 1fr); }
+  .vcoms-header-shell.has-kpi-row { min-height: 151px; max-height: 151px; }
+  .vcoms-header-shell.compact-header { min-height: 56px; max-height: 56px; }
   .vcoms-identity-panel { padding-left: 38px; padding-right: 10px; }
-  .vcoms-header-main { grid-template-rows: 48px 95px; }
   .vcoms-brand-area { min-width: 0; }
   .vcoms-brand-title { font-size: 24px; }
   .vcoms-brand-subtitle { font-size: 13px; }

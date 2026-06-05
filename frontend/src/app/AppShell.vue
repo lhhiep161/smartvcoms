@@ -39,10 +39,10 @@ onMounted(() => {
   </div>
   
     <div v-else class="app-container">
-    <div class="sidebar" :style="{ width: isSidebarOpen ? '250px' : '80px', transition: 'width 0.3s ease', whiteSpace: 'nowrap', overflow: 'hidden' }">
-        <div style="text-align: center; margin-bottom: 30px; padding: 10px 0;">
+    <div class="sidebar" :style="{ width: isSidebarOpen ? '250px' : '64px', padding: isSidebarOpen ? '20px' : '10px 6px', transition: 'width 0.3s ease, padding 0.3s ease', whiteSpace: 'nowrap', overflow: 'hidden', boxSizing: 'border-box' }">
+        <div :style="{ textAlign: 'center', marginBottom: isSidebarOpen ? '30px' : '18px', padding: isSidebarOpen ? '10px 0' : '6px 0' }">
             <img v-if="isSidebarOpen" :src="logoFull" style="max-width: 100%; max-height: 74px; height: auto; object-fit: contain;" alt="Portal CN9 Logo" />
-            <img v-else :src="logoMark" style="width: 36px; height: 36px; object-fit: contain;" alt="Portal CN9 Mark" />
+            <img v-else :src="logoMark" style="width: 32px; height: 32px; object-fit: contain;" alt="Portal CN9 Mark" />
         </div>
         <router-link
             v-for="item in menuItems"
@@ -51,13 +51,13 @@ onMounted(() => {
             class="sidebar-menu-item"
             active-class="active"
             style="text-decoration: none; display: flex; align-items: center;"
-            :style="{ justifyContent: isSidebarOpen ? 'flex-start' : 'center' }"
+            :style="{ justifyContent: isSidebarOpen ? 'flex-start' : 'center', padding: isSidebarOpen ? '12px 15px' : '10px', width: isSidebarOpen ? 'auto' : '44px', height: isSidebarOpen ? 'auto' : '44px', alignSelf: isSidebarOpen ? 'stretch' : 'center' }"
         >
-            <span style="font-size: 20px;">{{ item.icon }}</span><span v-if="isSidebarOpen" style="margin-left: 10px;">{{ item.label }}</span>
+            <span :style="{ fontSize: isSidebarOpen ? '20px' : '19px', lineHeight: 1 }">{{ item.icon }}</span><span v-if="isSidebarOpen" style="margin-left: 10px;">{{ item.label }}</span>
         </router-link>
         <div style="flex-grow: 1;"></div>
-        <div class="sidebar-menu-item" style="color: #ed1c24; cursor: pointer; display: flex; align-items: center;" :style="{ justifyContent: isSidebarOpen ? 'flex-start' : 'center' }" @click="handleLogout">
-            <span style="font-size: 20px;">⏻</span><span v-if="isSidebarOpen" style="margin-left: 10px;">Đăng xuất</span>
+        <div class="sidebar-menu-item" style="color: #ed1c24; cursor: pointer; display: flex; align-items: center;" :style="{ justifyContent: isSidebarOpen ? 'flex-start' : 'center', padding: isSidebarOpen ? '12px 15px' : '10px', width: isSidebarOpen ? 'auto' : '44px', height: isSidebarOpen ? 'auto' : '44px', alignSelf: isSidebarOpen ? 'stretch' : 'center' }" @click="handleLogout">
+            <span :style="{ fontSize: isSidebarOpen ? '20px' : '19px', lineHeight: 1 }">⏻</span><span v-if="isSidebarOpen" style="margin-left: 10px;">Đăng xuất</span>
         </div>
     </div>
 
