@@ -15,7 +15,7 @@ Hiện tại package đã được chuẩn hóa để:
 ## 2. Yêu cầu máy triển khai
 
 - Windows
-- Python đã cài và gọi được bằng `py`
+- Python đã cài và gọi được bằng `python`
 - Outlook desktop đã đăng nhập nếu muốn đọc mail thật
 
 Không bắt buộc:
@@ -27,7 +27,7 @@ Không bắt buộc:
 Tại thư mục `SmartVCOMS_Package`, chạy:
 
 ```bat
-py -m pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 ## 4. Cấu hình chính
@@ -134,7 +134,7 @@ PORTAL_EMERGENCY_PASSWORD_HASH=
 Tạo hash emergency password bằng:
 
 ```bat
-py tools\generate_emergency_password_hash.py
+python tools\generate_emergency_password_hash.py
 ```
 
 Script sẽ:

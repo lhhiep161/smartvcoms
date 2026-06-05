@@ -17,3 +17,6 @@ runtime_data/
 *.sqlite3
 
 frontend/node_modules/
+build/
+wheelhouse/
+offline_packages/
