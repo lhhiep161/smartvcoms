@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from backend.core.portal_permission_engine import assert_permission
+from backend.core.portal_permission_engine import assert_permission, can
 from backend.modules.auth.router import get_current_user
 from backend.modules.smartvcoms.services.actions_service import (
     apply_manual_action,
@@ -24,6 +24,18 @@ from backend.modules.smartvcoms.services.kanban_service import fetch_vcoms_cases
 from backend.modules.smartvcoms.services.stats_service import load_statistics
 
 router = APIRouter(prefix="/api/vcoms", tags=["SmartVCOMS"])
+
+
+def _can_read_lookup_config(current_user: dict) -> bool:
+    return any(
+        can(current_user, "SmartVCOMS", "view", part_id=part_id)
+        for part_id in ("ban_dieu_phoi", "thong_ke", "quan_tri_he_thong")
+    )
+
+
+def _assert_lookup_config_permission(current_user: dict) -> None:
+    if not _can_read_lookup_config(current_user):
+        raise HTTPException(status_code=403, detail="Không có quyền đọc dữ liệu tra cứu SmartVCOMS.")
 
 
 class RuleUpdatePayload(BaseModel):
@@ -51,6 +63,12 @@ class ConfigUpdateRequest(BaseModel):
 def get_vcoms_cases(current_user: dict = Depends(get_current_user)):
     assert_permission(current_user, "SmartVCOMS", "view", part_id="ban_dieu_phoi", message="Không có quyền xem Bàn điều phối SmartVCOMS.")
     return fetch_vcoms_cases(current_user)
+
+
+@router.get("/lookup/config")
+def get_vcoms_lookup_config(current_user: dict = Depends(get_current_user)):
+    _assert_lookup_config_permission(current_user)
+    return load_admin_config()
 
 
 @router.put("/admin/rules")
