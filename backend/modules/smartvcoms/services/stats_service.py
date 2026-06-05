@@ -1,4 +1,3 @@
-import sqlite3
 from datetime import datetime
 
 import pandas as pd
@@ -6,6 +5,7 @@ import pandas as pd
 from backend.modules.smartvcoms.utils import (
     VCOMS_DB_PATH,
     calc_real_elapsed_mins,
+    connect_vcoms_sqlite,
     init_vcoms_extended_tables,
     parse_excel_datetime,
 )
@@ -27,7 +27,7 @@ def _get_record_date(row):
 
 def _load_room_display_map() -> dict:
     try:
-        conn = sqlite3.connect(VCOMS_DB_PATH)
+        conn = connect_vcoms_sqlite(VCOMS_DB_PATH)
         rows = conn.execute("SELECT room_name, display_name FROM vcoms_room_config").fetchall()
         conn.close()
         return {
@@ -41,7 +41,7 @@ def _load_room_display_map() -> dict:
 
 def _load_sla_cfg_map() -> dict:
     try:
-        conn = sqlite3.connect(VCOMS_DB_PATH)
+        conn = connect_vcoms_sqlite(VCOMS_DB_PATH)
         rows = conn.execute("SELECT key, value FROM sla_config").fetchall()
         conn.close()
         return {str(key).strip().upper(): str(value).strip() for key, value in rows}
