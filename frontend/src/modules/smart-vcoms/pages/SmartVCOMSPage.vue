@@ -244,9 +244,34 @@ const showCaseDetail = ref(false)
 const selectedCase = ref(null)
 const editCaseData = ref({})
 
+const resolveCaseOfficerId = (caseData) => {
+    const rawCandidates = [
+        caseData?.cb_httd,
+        caseData?.cb_id,
+        caseData?.assigned_officer,
+    ]
+    const officers = readyOfficers.value || []
+
+    for (const raw of rawCandidates) {
+        const value = String(raw || '').trim()
+        if (!value || value === '---') continue
+
+        const matched = officers.find(cb => {
+            const id = String(cb.ID_CB || '').trim()
+            const name = String(cb['Tên Cán bộ'] || '').trim()
+            return id.toUpperCase() === value.toUpperCase()
+                || name.toUpperCase() === value.toUpperCase()
+        })
+
+        if (matched) return String(matched.ID_CB || '').trim()
+    }
+
+    return String(caseData?.cb_id || caseData?.cb_httd || '').trim()
+}
+
 const openCaseDetail = (c) => {
     selectedCase.value = c
-    editCaseData.value = { ...c }
+    editCaseData.value = { ...c, cb_httd: resolveCaseOfficerId(c) }
     showCaseDetail.value = true
 }
 
@@ -275,7 +300,7 @@ const removeOverride = async (field) => {
 
 const updateSelectedCase = () => {
     const updated = cases.value.find(c => c.case_key === selectedCase.value.case_key)
-    if (updated) { selectedCase.value = updated; editCaseData.value = { ...updated } }
+    if (updated) { selectedCase.value = updated; editCaseData.value = { ...updated, cb_httd: resolveCaseOfficerId(updated) } }
 }
 
 const manualNote = ref('')
@@ -846,10 +871,10 @@ const closedCasesPairs = computed(() => {
                         <td>
                             <div style="display: flex; gap: 5px;">
                                 <select v-model="editCaseData.cb_httd" class="table-input" :class="{ 'override-input': isOverridden('cb_httd') }">
-                                    <option v-if="!readyOfficers.some(cb => String(cb.ID_CB) === String(selectedCase.cb_id || selectedCase.cb_httd))" :value="String(selectedCase.cb_id || selectedCase.cb_httd || '')">{{ selectedCase.cb_id || selectedCase.cb_httd || 'Chưa phân công' }} (Hiện tại)</option>
-                                    <option v-for="cb in readyOfficers" :key="cb.ID_CB" :value="String(cb.ID_CB)">{{ cb.ID_CB }} - {{ cb['Tên Cán bộ'] }} {{ String(cb.ID_CB) === String(selectedCase.cb_id || selectedCase.cb_httd) ? '(Hiện tại)' : '' }}</option>
+                                    <option v-if="!readyOfficers.some(cb => String(cb.ID_CB || '').trim().toUpperCase() === String(resolveCaseOfficerId(selectedCase) || '').trim().toUpperCase())" :value="String(resolveCaseOfficerId(selectedCase) || '').trim()">{{ selectedCase.cb_id || selectedCase.cb_httd || 'Chưa phân công' }} (Hiện tại)</option>
+                                    <option v-for="cb in readyOfficers" :key="cb.ID_CB" :value="String(cb.ID_CB || '').trim()">{{ cb.ID_CB }} - {{ cb['Tên Cán bộ'] }} {{ String(cb.ID_CB || '').trim().toUpperCase() === String(resolveCaseOfficerId(selectedCase) || '').trim().toUpperCase() ? '(Hiện tại)' : '' }}</option>
                                 </select>
-                                <button v-if="isOverridden('cb_httd') && String(editCaseData.cb_httd) === String(selectedCase.cb_id || selectedCase.cb_httd)" class="input-action-btn" title="Mở khóa" @click="removeOverride('cb_httd')">🔓</button>
+                                <button v-if="isOverridden('cb_httd') && String(editCaseData.cb_httd || '').trim().toUpperCase() === String(resolveCaseOfficerId(selectedCase) || '').trim().toUpperCase()" class="input-action-btn" title="Mở khóa" @click="removeOverride('cb_httd')">🔓</button>
                                 <button v-else class="input-action-btn" title="Lưu phân giao thủ công" @click="saveOverride('cb_httd', editCaseData.cb_httd)">💾</button>
                             </div>
                         </td>
