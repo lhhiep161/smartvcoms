@@ -1,4 +1,5 @@
 import ast
+import json
 from datetime import datetime
 
 from backend.modules.smartvcoms.utils import (
@@ -7,6 +8,124 @@ from backend.modules.smartvcoms.utils import (
     connect_vcoms_sqlite,
     init_vcoms_extended_tables,
 )
+
+CASE_IDENTITY_FIELDS = [
+    "business_date",
+    "cif",
+    "ma_ho_so",
+    "amount",
+    "flow_type",
+]
+
+MANUAL_ACTION_SNAPSHOT_FIELDS = [
+    "current_stage_code",
+    "current_stage_label",
+    "current_status",
+    "completion_type",
+    "is_open",
+    "completed_time",
+    "manual_completed_time",
+    "manual_finish_time",
+    "sign_time",
+    "disbursed_time",
+    "updated_at",
+    "updated_by",
+]
+
+STAGE_LABEL_FALLBACK = {
+    "ARRIVAL": "Hồ sơ đến",
+    "WAIT_ACCEPT": "Chờ tiếp nhận",
+    "PROCESSING": "Đang xử lý",
+    "WAIT_SIGN": "Chờ BGĐ ký số",
+    "WAIT_MANUAL_DONE": "Chờ hoàn tất thủ công",
+    "WAIT_DISBURSE": "Chờ giải ngân",
+    "DONE": "Hoàn thành",
+}
+
+
+def _quote_identifier(identifier: str) -> str:
+    return '"' + str(identifier).replace('"', '""') + '"'
+
+
+def _table_columns(conn, table_name: str) -> set[str]:
+    return {str(row[1]) for row in conn.execute(f"PRAGMA table_info({_quote_identifier(table_name)})").fetchall()}
+
+
+def _read_case_snapshot(conn, case_key: str) -> dict | None:
+    columns = _table_columns(conn, "vcoms_case_state")
+    wanted_fields = [field for field in CASE_IDENTITY_FIELDS + MANUAL_ACTION_SNAPSHOT_FIELDS if field in columns]
+    if not wanted_fields:
+        return None
+    select_sql = ", ".join(_quote_identifier(field) for field in wanted_fields)
+    row = conn.execute(
+        f"SELECT {select_sql} FROM vcoms_case_state WHERE case_key=?",
+        (case_key,),
+    ).fetchone()
+    if not row:
+        return None
+    return dict(zip(wanted_fields, row))
+
+
+def _dump_audit_value(value: dict) -> str:
+    return json.dumps(value or {}, ensure_ascii=False, default=str)
+
+
+def _parse_audit_value(raw_value) -> dict:
+    if not raw_value:
+        return {}
+    if isinstance(raw_value, dict):
+        return raw_value
+    raw_text = str(raw_value).strip()
+    if not raw_text:
+        return {}
+    try:
+        parsed = json.loads(raw_text)
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        pass
+    try:
+        parsed = ast.literal_eval(raw_text)
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
+
+
+def _restore_case_state_snapshot(conn, case_key: str, snapshot: dict) -> bool:
+    if not snapshot:
+        return False
+
+    columns = _table_columns(conn, "vcoms_case_state")
+    restore_values = {}
+
+    for field in MANUAL_ACTION_SNAPSHOT_FIELDS:
+        if field in columns and field in snapshot:
+            restore_values[field] = snapshot.get(field)
+
+    stage_code = str(snapshot.get("current_stage_code") or "").strip()
+    if stage_code and "current_stage_code" in columns:
+        restore_values.setdefault("current_stage_code", stage_code)
+    if stage_code and "current_stage_label" in columns:
+        restore_values.setdefault("current_stage_label", STAGE_LABEL_FALLBACK.get(stage_code, stage_code))
+
+    # Backward-compatible fallback for older audit rows that only stored current_stage_code.
+    if stage_code:
+        if "current_status" in columns:
+            restore_values.setdefault("current_status", "OPEN")
+        if "completion_type" in columns:
+            restore_values.setdefault("completion_type", "")
+        if "is_open" in columns:
+            restore_values.setdefault("is_open", 1)
+
+    restore_values = {field: value for field, value in restore_values.items() if field in columns}
+    if not restore_values:
+        return False
+
+    assignments = ", ".join(f"{_quote_identifier(field)}=?" for field in restore_values.keys())
+    conn.execute(
+        f"UPDATE vcoms_case_state SET {assignments} WHERE case_key=?",
+        [*restore_values.values(), case_key],
+    )
+    return True
 
 
 def save_rule_engine_config(routing: list[dict], assignment: list[dict]) -> dict:
@@ -97,6 +216,7 @@ def load_rule_engine_config() -> dict:
 
 
 def apply_manual_action(case_key: str, action_type: str, note: str, current_user: dict) -> dict:
+    conn = None
     try:
         now = datetime.now().isoformat(timespec="seconds")
         action_up = str(action_type).upper().strip()
@@ -105,14 +225,8 @@ def apply_manual_action(case_key: str, action_type: str, note: str, current_user
             raise ValueError(f"Unsupported action_type: {action_up}")
 
         conn = connect_vcoms_sqlite(VCOMS_DB_PATH)
-        old = conn.execute(
-            """
-            SELECT business_date, cif, ma_ho_so, amount, flow_type, current_stage_code
-            FROM vcoms_case_state WHERE case_key=?
-            """,
-            (case_key,),
-        ).fetchone()
-        if not old:
+        old_snapshot = _read_case_snapshot(conn, case_key)
+        if not old_snapshot:
             conn.close()
             return {"status": "error", "message": "Không tìm thấy hồ sơ"}
 
@@ -123,10 +237,31 @@ def apply_manual_action(case_key: str, action_type: str, note: str, current_user
                 case_key,business_date,cif,ma_ho_so,amount,flow_type,action_type,action_time,action_by,note,created_at,is_active
             ) VALUES(?,?,?,?,?,?,?,?,?,?,?,1)
             """,
-            (case_key, old[0], old[1], old[2], old[3], old[4], action_up, now, user, note, now),
+            (
+                case_key,
+                old_snapshot.get("business_date"),
+                old_snapshot.get("cif"),
+                old_snapshot.get("ma_ho_so"),
+                old_snapshot.get("amount"),
+                old_snapshot.get("flow_type"),
+                action_up,
+                now,
+                user,
+                note,
+                now,
+            ),
         )
 
         if action_up == "MANUAL_WAIT_DISBURSE":
+            next_snapshot = {
+                "current_stage_code": "WAIT_DISBURSE",
+                "current_stage_label": "Chờ giải ngân",
+                "current_status": "OPEN",
+                "is_open": 1,
+                "completion_type": "",
+                "updated_at": now,
+                "updated_by": user,
+            }
             conn.execute(
                 """
                 UPDATE vcoms_case_state
@@ -137,6 +272,18 @@ def apply_manual_action(case_key: str, action_type: str, note: str, current_user
                 (now, user, case_key),
             )
         else:
+            next_snapshot = {
+                "current_stage_code": "DONE",
+                "current_stage_label": "Hoàn thành",
+                "current_status": "CLOSED",
+                "is_open": 0,
+                "manual_completed_time": now,
+                "manual_finish_time": now,
+                "completed_time": now,
+                "completion_type": "MANUAL_DONE",
+                "updated_at": now,
+                "updated_by": user,
+            }
             conn.execute(
                 """
                 UPDATE vcoms_case_state
@@ -148,6 +295,7 @@ def apply_manual_action(case_key: str, action_type: str, note: str, current_user
                 (now, now, now, now, user, case_key),
             )
 
+        audit_old_value = {field: old_snapshot.get(field) for field in MANUAL_ACTION_SNAPSHOT_FIELDS if field in old_snapshot}
         conn.execute(
             """
             INSERT INTO vcoms_case_audit(case_key, action, old_value, new_value, changed_by, changed_at, note)
@@ -156,8 +304,8 @@ def apply_manual_action(case_key: str, action_type: str, note: str, current_user
             (
                 case_key,
                 action_up,
-                str({"current_stage_code": old[5]}),
-                str({"current_stage_code": "WAIT_DISBURSE" if action_up == "MANUAL_WAIT_DISBURSE" else "DONE"}),
+                _dump_audit_value(audit_old_value),
+                _dump_audit_value(next_snapshot),
                 user,
                 now,
                 note,
@@ -167,10 +315,17 @@ def apply_manual_action(case_key: str, action_type: str, note: str, current_user
         conn.close()
         return {"status": "success", "message": "Cập nhật trạng thái thủ công thành công."}
     except Exception as exc:
+        if conn is not None:
+            try:
+                conn.rollback()
+                conn.close()
+            except Exception:
+                pass
         return {"status": "error", "message": str(exc)}
 
 
 def remove_manual_action(case_key: str) -> dict:
+    conn = None
     try:
         conn = connect_vcoms_sqlite(VCOMS_DB_PATH)
         conn.execute(
@@ -187,38 +342,19 @@ def remove_manual_action(case_key: str) -> dict:
             (case_key,),
         ).fetchone()
         if old_val_row and old_val_row[0]:
-            try:
-                old_val_dict = ast.literal_eval(old_val_row[0])
-                if isinstance(old_val_dict, dict):
-                    stage_code = old_val_dict.get("current_stage_code", "")
-                    status = old_val_dict.get("current_status", "OPEN")
-                    comp_type = old_val_dict.get("completion_type", "")
-                    is_open = int(old_val_dict.get("is_open", 1))
-                    mapping = {
-                        "ARRIVAL": "Hồ sơ đến",
-                        "WAIT_ACCEPT": "Chờ tiếp nhận",
-                        "PROCESSING": "Đang xử lý",
-                        "WAIT_SIGN": "Chờ BGĐ ký số",
-                        "WAIT_MANUAL_DONE": "Chờ hoàn tất thủ công",
-                        "WAIT_DISBURSE": "Chờ giải ngân",
-                        "DONE": "Hoàn thành",
-                    }
-                    stage_label = mapping.get(stage_code, stage_code)
-                    conn.execute(
-                        """
-                        UPDATE vcoms_case_state
-                        SET current_stage_code=?, current_stage_label=?, current_status=?, completion_type=?, is_open=?
-                        WHERE case_key=?
-                        """,
-                        (stage_code, stage_label, status, comp_type, is_open, case_key),
-                    )
-            except Exception:
-                pass
+            old_val_dict = _parse_audit_value(old_val_row[0])
+            _restore_case_state_snapshot(conn, case_key, old_val_dict)
 
         conn.commit()
         conn.close()
         return {"status": "success", "message": "Đã hủy thao tác luân chuyển. Hồ sơ quay về luồng tự động."}
     except Exception as exc:
+        if conn is not None:
+            try:
+                conn.rollback()
+                conn.close()
+            except Exception:
+                pass
         return {"status": "error", "message": str(exc)}
 
 
