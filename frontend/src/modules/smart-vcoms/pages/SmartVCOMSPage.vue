@@ -403,21 +403,82 @@ const closedCasesPairs = computed(() => {
 
 <template>
   <div class="vcoms-container">
-    <!-- HEADER VÀ TABS -->
-    <div class="vcoms-topbar">
-        <div class="vcoms-brand-area">
-            <div class="vcoms-brand-title">SmartVCOMS</div>
-            <div class="vcoms-brand-subtitle">Điều phối &amp; Giám sát SLA</div>
+    <div class="vcoms-header-shell">
+        <div class="vcoms-identity-panel">
+            <div class="vcoms-brand-area">
+                <div class="vcoms-brand-title">SmartVCOMS</div>
+                <div class="vcoms-brand-subtitle">Điều phối &amp; Giám sát SLA</div>
+            </div>
         </div>
-        <div class="vcoms-tabs-area">
-            <button v-if="canViewKanban" :class="['tv-tab', activeTab === 'BAN_DIEU_PHOI' ? 'active' : '']" @click="activeTab = 'BAN_DIEU_PHOI'">📍 BÀN ĐIỀU PHỐI</button>
-            <button v-if="canViewStatistics" :class="['tv-tab', activeTab === 'THONG_KE' ? 'active' : '']" @click="activeTab = 'THONG_KE'">📊 THỐNG KÊ</button>
-            <button v-if="canViewAdmin" :class="['tv-tab', activeTab === 'QUAN_TRI' ? 'active' : '']" @click="activeTab = 'QUAN_TRI'">⚙️ QUẢN TRỊ</button>
-            <button v-if="canViewAdmin" :class="['tv-tab', activeTab === 'RULE_ENGINE' ? 'active' : '']" @click="activeTab = 'RULE_ENGINE'">🧠 RULE ENGINE</button>
-        </div>
-        <div class="vcoms-actions-area">
-            <span class="vcoms-meta-pill vcoms-date-badge">🕒 {{ currentDate }}</span>
-            <span class="vcoms-meta-pill vcoms-update-pill">🔄 Cập nhật: <strong>{{ lastUpdate }}</strong></span>
+        <div class="vcoms-header-main">
+            <div class="vcoms-topbar">
+                <div class="vcoms-tabs-area">
+                    <button v-if="canViewKanban" :class="['tv-tab', activeTab === 'BAN_DIEU_PHOI' ? 'active' : '']" @click="activeTab = 'BAN_DIEU_PHOI'">📍 BÀN ĐIỀU PHỐI</button>
+                    <button v-if="canViewStatistics" :class="['tv-tab', activeTab === 'THONG_KE' ? 'active' : '']" @click="activeTab = 'THONG_KE'">📊 THỐNG KÊ</button>
+                    <button v-if="canViewAdmin" :class="['tv-tab', activeTab === 'QUAN_TRI' ? 'active' : '']" @click="activeTab = 'QUAN_TRI'">⚙️ QUẢN TRỊ</button>
+                    <button v-if="canViewAdmin" :class="['tv-tab', activeTab === 'RULE_ENGINE' ? 'active' : '']" @click="activeTab = 'RULE_ENGINE'">🧠 RULE ENGINE</button>
+                </div>
+                <div class="vcoms-actions-area">
+                    <span class="vcoms-meta-pill vcoms-date-badge">🕒 {{ currentDate }}</span>
+                    <span class="vcoms-meta-pill vcoms-update-pill">🔄 Cập nhật: <strong>{{ lastUpdate }}</strong></span>
+                </div>
+            </div>
+
+            <div v-if="activeTab === 'BAN_DIEU_PHOI'" class="vcoms-kpi-row">
+                <div class="vcoms-kpi-cards">
+                    <div class="kpi-card bg-total">
+                        <div class="kpi-icon">📋</div>
+                        <div class="kpi-content">
+                            <div class="kpi-title">Tổng HS Hôm Nay</div>
+                            <div class="kpi-val">{{ totalCases }}</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card bg-open">
+                        <div class="kpi-icon">⏳</div>
+                        <div class="kpi-content">
+                            <div class="kpi-title">Đang Xử Lý</div>
+                            <div class="kpi-val">{{ openCasesCount }}</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card bg-closed">
+                        <div class="kpi-icon">✅</div>
+                        <div class="kpi-content">
+                            <div class="kpi-title">Đã Hoàn Tất</div>
+                            <div class="kpi-val">{{ closedCases.length }}</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card bg-rate">
+                        <div class="kpi-icon">◔</div>
+                        <div class="kpi-content">
+                            <div class="kpi-title">Tỷ Lệ Hoàn Thành</div>
+                            <div class="kpi-val">{{ completionRate }}%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="vcoms-officer-card">
+                    <div v-for="cb in chartData" :key="cb.name" class="chart-bar-hover vcoms-officer-row" @click="openStatDetail({cb: [cb.name]})">
+                        <div class="vcoms-officer-name" :title="cb.name">
+                            {{ cb.name }}
+                        </div>
+                        <div class="vcoms-officer-status">
+                            <span v-if="cb.status === 'Ready'">🟢</span>
+                            <span v-else-if="cb.status === 'Off'">❌</span>
+                            <span v-else-if="cb.status === 'Biztrip'">✈️</span>
+                            <span v-else>🟢</span>
+                            {{ cb.status === 'Ready' ? 'Sẵn sàng' : (cb.status === 'Off' ? 'Off' : (cb.status === 'Biztrip' ? 'Biztrip' : cb.status)) }}
+                        </div>
+                        <div class="vcoms-officer-progress">
+                            <div v-if="cb.processing > 0" :style="{ width: ((cb.processing / cb._max) * 100) + '%' }" class="officer-progress-processing">
+                                {{ cb.processing }}
+                            </div>
+                            <div v-if="cb.closed > 0" :style="{ width: ((cb.closed / cb._max) * 100) + '%' }" class="officer-progress-closed">
+                                {{ cb.closed }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -427,67 +488,6 @@ const closedCasesPairs = computed(() => {
 
     <!-- NỘI DUNG TABS -->
     <div v-else-if="activeTab === 'BAN_DIEU_PHOI'" class="vcoms-tab-pane">
-        <div class="vcoms-kpi-row">
-            <div class="vcoms-kpi-cards">
-                <div class="kpi-card bg-total">
-                    <div class="kpi-icon">📋</div>
-                    <div class="kpi-content">
-                        <div class="kpi-title">Tổng HS Hôm Nay</div>
-                        <div class="kpi-val">{{ totalCases }}</div>
-                    </div>
-                </div>
-                <div class="kpi-card bg-open">
-                    <div class="kpi-icon">⏳</div>
-                    <div class="kpi-content">
-                        <div class="kpi-title">Đang Xử Lý</div>
-                        <div class="kpi-val">{{ openCasesCount }}</div>
-                    </div>
-                </div>
-                <div class="kpi-card bg-closed">
-                    <div class="kpi-icon">✅</div>
-                    <div class="kpi-content">
-                        <div class="kpi-title">Đã Hoàn Tất</div>
-                        <div class="kpi-val">{{ closedCases.length }}</div>
-                    </div>
-                </div>
-                <div class="kpi-card bg-rate">
-                    <div class="kpi-icon">◔</div>
-                    <div class="kpi-content">
-                        <div class="kpi-title">Tỷ Lệ Hoàn Thành</div>
-                        <div class="kpi-val">{{ completionRate }}%</div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="vcoms-officer-card">
-                <div class="vcoms-officer-header">
-                    <span class="vcoms-officer-header-icon">👤</span>
-                    <span class="vcoms-officer-header-title">Tình trạng cán bộ</span>
-                </div>
-                <div v-for="cb in chartData" :key="cb.name" class="chart-bar-hover vcoms-officer-row" @click="openStatDetail({cb: [cb.name]})">
-                    <div class="vcoms-officer-name" :title="cb.name">
-                        {{ cb.name }}
-                    </div>
-                    <div class="vcoms-officer-status">
-                        <span v-if="cb.status === 'Ready'">🟢</span>
-                        <span v-else-if="cb.status === 'Off'">❌</span>
-                        <span v-else-if="cb.status === 'Biztrip'">✈️</span>
-                        <span v-else>🟢</span>
-                        {{ cb.status === 'Ready' ? 'Sẵn sàng' : (cb.status === 'Off' ? 'Off' : (cb.status === 'Biztrip' ? 'Biztrip' : cb.status)) }}
-                    </div>
-                    <div class="vcoms-officer-progress">
-                        <div v-if="cb.processing > 0" :style="{ width: ((cb.processing / cb._max) * 100) + '%' }" class="officer-progress-processing">
-                            {{ cb.processing }}
-                        </div>
-                        <div v-if="cb.closed > 0" :style="{ width: ((cb.closed / cb._max) * 100) + '%' }" class="officer-progress-closed">
-                            {{ cb.closed }}
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-
         <h3 v-if="loading" style="text-align: center; margin-top: 50px; color: #666;">⏳ Đang đồng bộ dữ liệu từ SQLite...</h3>
 
         <div v-else class="kanban-board">
@@ -884,11 +884,14 @@ const closedCasesPairs = computed(() => {
 .table-input:focus { background: white; border-color: #005993; outline: none; }
 
 .vcoms-container { height: calc(100vh - 20px); display: flex; flex-direction: column; overflow: hidden; background: linear-gradient(180deg, #eef8ff 0%, #def6ff 100%); margin: -10px; padding: 12px 14px 12px; }
-.vcoms-topbar { display: grid; grid-template-columns: minmax(260px, 300px) minmax(0, 1fr) auto; align-items: center; gap: 16px; margin-bottom: 8px; padding-left: 44px; padding-right: 8px; min-height: 56px; }
-.vcoms-brand-area { min-width: 260px; display: flex; flex-direction: column; justify-content: center; gap: 2px; overflow: hidden; }
-.vcoms-brand-title { font-size: 23px; font-weight: 900; color: #003b73; line-height: 1.05; letter-spacing: -0.3px; white-space: nowrap; }
-.vcoms-brand-subtitle { font-size: 13.5px; font-weight: 600; color: #64748b; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vcoms-tabs-area { display: flex; align-items: center; justify-content: center; gap: 10px; min-width: 0; overflow: hidden; }
+.vcoms-header-shell { display: grid; grid-template-columns: minmax(220px, 245px) minmax(0, 1fr); gap: 12px; min-height: 151px; max-height: 151px; margin-bottom: 8px; overflow: hidden; }
+.vcoms-identity-panel { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; padding: 8px 10px 8px 42px; overflow: hidden; text-align: left; }
+.vcoms-header-main { min-width: 0; display: grid; grid-template-rows: 48px 95px; gap: 8px; }
+.vcoms-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding-right: 4px; }
+.vcoms-brand-area { min-width: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px; overflow: hidden; }
+.vcoms-brand-title { font-size: 28px; font-weight: 900; color: #c8102e; line-height: 1; letter-spacing: -0.45px; white-space: nowrap; }
+.vcoms-brand-subtitle { font-size: 15px; font-weight: 700; color: #005993; line-height: 1.12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vcoms-tabs-area { display: flex; align-items: center; justify-content: flex-start; gap: 10px; min-width: 0; overflow: hidden; }
 .vcoms-actions-area { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
 .vcoms-meta-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: rgba(255,255,255,0.82); border: 1px solid #d8e4ef; color: #4b5563; font-size: 13px; box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04); white-space: nowrap; }
 .vcoms-date-badge { color: #0f4c81; font-weight: 700; border-color: #cfe1f1; box-shadow: 0 4px 10px rgba(0, 89, 147, 0.06); }
@@ -900,19 +903,19 @@ const closedCasesPairs = computed(() => {
 .tv-tab.active { background: linear-gradient(135deg, #005993, #0b6bb0); color: white; border-color: transparent; box-shadow: 0 6px 14px rgba(0,89,147,0.18); }
 
 .vcoms-tab-pane { display: flex; flex-direction: column; flex-grow: 1; overflow: hidden; }
-.vcoms-kpi-row { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(360px, 1fr); gap: 12px; height: 95px; max-height: 95px; margin-bottom: 12px; overflow: hidden; }
+.vcoms-kpi-row { display: grid; grid-template-columns: minmax(0, 4fr) minmax(260px, 1.35fr); gap: 12px; height: 95px; max-height: 95px; overflow: hidden; }
 .vcoms-kpi-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; height: 100%; min-width: 0; }
-.kpi-card { height: 100%; min-height: 0; box-sizing: border-box; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 4px 12px rgba(0, 59, 115, 0.06); padding: 9px 12px; display: grid; grid-template-columns: 42px 1fr; align-items: center; gap: 10px; overflow: hidden; position: relative; }
+.kpi-card { height: 100%; min-height: 0; box-sizing: border-box; border: 1px solid rgba(226, 232, 240, 0.9); border-radius: 14px; box-shadow: 0 4px 12px rgba(0, 59, 115, 0.06); padding: 9px 12px; display: grid; grid-template-columns: 42px 1fr; align-items: center; gap: 10px; overflow: hidden; position: relative; }
 .kpi-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
 .kpi-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 19px; flex-shrink: 0; background: #f8fafc; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.55); }
 .kpi-content { min-width: 0; text-align: left; display: flex; flex-direction: column; justify-content: center; }
 .kpi-title { font-size: 12.75px; font-weight: 800; line-height: 1.1; text-transform: uppercase; letter-spacing: 0.15px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi-val { font-size: 31px; font-weight: 900; line-height: 1; margin-top: 1px; }
 
-.bg-total,
-.bg-open,
-.bg-closed,
-.bg-rate { background: #ffffff; }
+.bg-total { background: linear-gradient(135deg, #e9f4ff 0%, #d7ebff 100%); }
+.bg-open { background: linear-gradient(135deg, #fff4e4 0%, #ffe6c4 100%); }
+.bg-closed { background: linear-gradient(135deg, #ebfaef 0%, #d7f2de 100%); }
+.bg-rate { background: linear-gradient(135deg, #f3ecff 0%, #e3d6ff 100%); }
 
 .bg-total::before { background: #005993; }
 .bg-open::before { background: #f39c12; }
@@ -933,14 +936,11 @@ const closedCasesPairs = computed(() => {
 .bg-closed .kpi-icon { background: #ecfdf3; color: #2e7d32; }
 .bg-rate .kpi-icon { background: #f5efff; color: #7c3aed; }
 
-.vcoms-officer-card { height: 100%; max-height: 95px; box-sizing: border-box; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 4px 12px rgba(0, 59, 115, 0.06); padding: 8px 12px; overflow: hidden; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.vcoms-officer-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 18px; }
-.vcoms-officer-header-icon { width: 20px; height: 20px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; background: #edf6ff; color: #005993; flex-shrink: 0; }
-.vcoms-officer-header-title { font-size: 12px; font-weight: 800; color: #003B73; text-transform: uppercase; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vcoms-officer-row { display: grid; grid-template-columns: minmax(88px, 122px) minmax(72px, 86px) minmax(92px, 1fr); align-items: center; gap: 8px; height: 18px; cursor: pointer; min-width: 0; }
+.vcoms-officer-card { height: 100%; max-height: 95px; box-sizing: border-box; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 4px 12px rgba(0, 59, 115, 0.06); padding: 8px 12px; overflow: hidden; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
+.vcoms-officer-row { display: grid; grid-template-columns: minmax(76px, 104px) minmax(72px, 84px) minmax(72px, 1fr); align-items: center; gap: 8px; height: 18px; cursor: pointer; min-width: 0; }
 .vcoms-officer-name { font-size: 12px; font-weight: 800; color: #003B73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vcoms-officer-status { font-size: 11px; font-weight: 700; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
-.vcoms-officer-progress { height: 8px; border-radius: 999px; overflow: hidden; background: #e2e8f0; display: flex; box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06); max-width: 132px; width: 100%; }
+.vcoms-officer-progress { height: 8px; border-radius: 999px; overflow: hidden; background: #e2e8f0; display: flex; box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06); max-width: 118px; width: 100%; }
 .officer-progress-processing, .officer-progress-closed { display: flex; justify-content: center; align-items: center; color: white; font-size: 10px; font-weight: 800; }
 .officer-progress-processing { background: linear-gradient(90deg, #f5a623, #f39c12); }
 .officer-progress-closed { background: linear-gradient(90deg, #22a861, #27ae60); }
@@ -1002,24 +1002,29 @@ const closedCasesPairs = computed(() => {
 .empty-state { text-align: center; color: #94a3b8 !important; font-style: italic; padding: 20px; }
 
 @media (max-width: 1500px) {
-  .vcoms-topbar { grid-template-columns: minmax(230px, 270px) minmax(0, 1fr) auto; padding-left: 40px; gap: 12px; }
+  .vcoms-header-shell { grid-template-columns: minmax(205px, 228px) minmax(0, 1fr); }
+  .vcoms-identity-panel { padding-left: 40px; gap: 10px; }
   .vcoms-brand-area { min-width: 230px; }
-  .vcoms-brand-title { font-size: 21px; }
-  .vcoms-brand-subtitle { font-size: 12.5px; }
+  .vcoms-brand-title { font-size: 28px; }
+  .vcoms-brand-subtitle { font-size: 14px; }
   .vcoms-meta-pill { font-size: 12px; padding-top: 4px; padding-bottom: 4px; }
   .tv-tab { padding: 7px 12px; }
+  .vcoms-kpi-row { grid-template-columns: minmax(0, 4fr) minmax(235px, 1.2fr); }
 }
 
 @media (max-width: 1280px) {
-  .vcoms-topbar { grid-template-columns: minmax(220px, 250px) minmax(0, 1fr); align-items: start; min-height: 54px; }
-  .vcoms-brand-area { min-width: 220px; }
-  .vcoms-brand-title { font-size: 19px; }
-  .vcoms-brand-subtitle { font-size: 12px; }
-  .vcoms-actions-area { grid-column: 2; justify-content: flex-end; flex-wrap: wrap; }
+  .vcoms-header-shell { grid-template-columns: minmax(186px, 206px) minmax(0, 1fr); min-height: 151px; max-height: 151px; }
+  .vcoms-identity-panel { padding-left: 38px; padding-right: 10px; }
+  .vcoms-header-main { grid-template-rows: 48px 95px; }
+  .vcoms-brand-area { min-width: 0; }
+  .vcoms-brand-title { font-size: 24px; }
+  .vcoms-brand-subtitle { font-size: 13px; }
+  .vcoms-topbar { align-items: flex-start; }
+  .vcoms-actions-area { justify-content: flex-end; flex-wrap: wrap; }
   .vcoms-tabs-area { justify-content: flex-start; flex-wrap: wrap; }
-  .vcoms-kpi-row { grid-template-columns: minmax(0, 1.45fr) minmax(320px, 1fr); gap: 10px; }
+  .vcoms-kpi-row { grid-template-columns: minmax(0, 4fr) minmax(220px, 1.08fr); gap: 10px; }
   .vcoms-kpi-cards { gap: 10px; }
   .kpi-card { padding-left: 10px; padding-right: 10px; }
-  .vcoms-officer-row { grid-template-columns: minmax(80px, 112px) minmax(70px, 82px) 1fr; gap: 6px; }
+  .vcoms-officer-row { grid-template-columns: minmax(72px, 96px) minmax(68px, 78px) 1fr; gap: 6px; }
 }
 </style>
