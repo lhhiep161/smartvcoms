@@ -9,7 +9,7 @@ import { useSmartVCOMS } from '../composables/useSmartVCOMS'
 
 use([CanvasRenderer, BarChart, LineChart, FunnelChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent]);
 
-const { fetchAPI, adminConfig, loadAdminConfig } = useSmartVCOMS()
+const { fetchAPI, adminConfig, loadLookupConfig } = useSmartVCOMS()
 const emit = defineEmits(['open-stat-detail'])
 
 const statMode = ref('today')
@@ -91,7 +91,7 @@ const onChartClick = (type, params) => {
 }
 
 onMounted(() => { 
-    loadAdminConfig();
+    loadLookupConfig();
     loadStatistics();
 })
 </script>
