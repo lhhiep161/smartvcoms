@@ -464,63 +464,129 @@ const closedCasesPairs = computed(() => {
 
     <div v-else-if="activeTab === 'BAN_DIEU_PHOI'" class="vcoms-tab-pane">
         <div class="kanban-board">
-            <div class="kanban-col col-open" style="flex: 1.35;">
-                <div class="kb-header">📥 BẢNG HỒ SƠ ĐANG MỞ</div>
-                <div class="kb-scroll">
-                    <div class="kb-title-sub">1. Hồ sơ đến / Chờ tiếp nhận</div>
+            <div class="kanban-col col-open">
+                <div class="kb-header">📌 BẢNG HỒ SƠ ĐANG MỞ ({{ openCasesCount }})</div>
+
+                <div class="kb-title-sub">📥 HỒ SƠ ĐẾN / CHỜ TIẾP NHẬN ({{ arrivalCases.length }})</div>
+                <div class="kb-scroll" style="max-height: 25vh;">
                     <table class="main-table">
-                        <thead><tr><th style="width: 16%">CIF</th><th style="width: 25%">Tên KH</th><th style="width: 18%">Số tiền</th><th style="width: 14%">CB</th><th style="width: 15%">SLA</th><th style="width: 12%">TĐ</th></tr></thead>
-                        <tbody>
-                            <tr v-for="c in arrivalCases" :key="c.case_key" :class="'sla-' + c.sla_status.toLowerCase()" @click="openCaseDetail(c)" style="cursor: pointer;">
-                                <td>{{ c.cif }}</td><td class="text-left"><span class="truncate" :title="c.customer_name">{{ smartTruncate(c.customer_name, 24) }}</span></td><td class="text-right no-wrap">{{ formatMoney(c.amount, c.currency) }}</td><td>{{ c.cb_id || c.cb_httd }}</td><td :class="c.sla_status === 'DANGER' ? 'time-red' : 'time-green'">{{ c.time_display }}</td><td>{{ c.stage_label }}</td>
+                        <thead>
+                            <tr>
+                                <th style="width:12%;">Phòng</th>
+                                <th style="width:36%;" class="text-left">Tên Khách Hàng</th>
+                                <th style="width:20%;" class="text-right">Số Tiền GN</th>
+                                <th style="width:10%;">CB</th>
+                                <th style="width:22%;">Tiến độ</th>
                             </tr>
-                            <tr v-if="arrivalCases.length === 0"><td colspan="6" style="color:#999; font-style:italic;">Không có hồ sơ</td></tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="c in arrivalCases" :key="c.case_key" class="clickable-row" @click="openCaseDetail(c)">
+                                <td>{{ c.room_short }}</td>
+                                <td class="text-left"><span class="truncate" :title="c.customer_name">{{ smartTruncate(c.customer_name, 34) }}</span></td>
+                                <td class="text-right">{{ formatMoneyFull(c.amount, c.currency) }}</td>
+                                <td>{{ c.cb_id || c.cb_httd || '---' }}</td>
+                                <td>
+                                    <span
+                                        class="truncate"
+                                        :title="c.stage_label"
+                                        :class="{ 'time-red': c.wait_mins > 45, 'time-orange': c.wait_mins > 30 && c.wait_mins <= 45, 'time-yellow': c.wait_mins > 15 && c.wait_mins <= 30 }"
+                                    >
+                                        {{ c.stage_label }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr v-if="arrivalCases.length === 0"><td colspan="5" class="empty-state">Chưa có hồ sơ</td></tr>
                         </tbody>
                     </table>
+                </div>
 
-                    <div class="kb-title-sub">2. Đang xử lý / Chờ ký số / Chờ hoàn tất</div>
+                <div class="kb-title-sub" style="margin-top: 10px;">⏳ ĐANG TÁC NGHIỆP / CHỜ BGĐ KÝ SỐ / CHỜ HOÀN TẤT ({{ processingCases.length }})</div>
+                <div class="kb-scroll">
                     <table class="main-table">
-                        <thead><tr><th style="width: 16%">CIF</th><th style="width: 25%">Tên KH</th><th style="width: 18%">Số tiền</th><th style="width: 14%">CB</th><th style="width: 15%">SLA</th><th style="width: 12%">TĐ</th></tr></thead>
-                        <tbody>
-                            <tr v-for="c in processingCases" :key="c.case_key" :class="'sla-' + c.sla_status.toLowerCase()" @click="openCaseDetail(c)" style="cursor: pointer;">
-                                <td>{{ c.cif }}</td><td class="text-left"><span class="truncate" :title="c.customer_name">{{ smartTruncate(c.customer_name, 24) }}</span></td><td class="text-right no-wrap">{{ formatMoney(c.amount, c.currency) }}</td><td>{{ c.cb_id || c.cb_httd }}</td><td :class="c.sla_status === 'DANGER' ? 'time-red' : 'time-green'">{{ c.time_display }}</td><td>{{ c.stage_label }}</td>
+                        <thead>
+                            <tr>
+                                <th style="width:11%;">Phòng</th>
+                                <th style="width:34%;" class="text-left">Tên Khách Hàng</th>
+                                <th style="width:19%;" class="text-right">Số Tiền GN</th>
+                                <th style="width:9%;">CB</th>
+                                <th style="width:18%;">Tiến độ</th>
+                                <th style="width:9%;">SLA</th>
                             </tr>
-                            <tr v-if="processingCases.length === 0"><td colspan="6" style="color:#999; font-style:italic;">Không có hồ sơ</td></tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="c in processingCases"
+                                :key="c.case_key"
+                                :class="[c.sla_status === 'DANGER' ? 'sla-red' : c.sla_status === 'WARNING' || c.sla_status === 'YELLOW' ? 'sla-yellow' : 'sla-green', 'clickable-row']"
+                                @click="openCaseDetail(c)"
+                            >
+                                <td>{{ c.room_short }}</td>
+                                <td class="text-left"><span class="truncate" :title="c.customer_name">{{ smartTruncate(c.customer_name, 34) }}</span></td>
+                                <td class="text-right">{{ formatMoneyFull(c.amount, c.currency) }}</td>
+                                <td>{{ c.cb_id || c.cb_httd || '---' }}</td>
+                                <td><span class="truncate" :title="c.stage_label">{{ c.stage_label }}</span></td>
+                                <td><b :class="c.sla_status === 'DANGER' ? 'time-red' : c.sla_status === 'WARNING' || c.sla_status === 'YELLOW' ? 'time-orange' : 'time-green'">{{ c.time_display }}</b></td>
+                            </tr>
+                            <tr v-if="processingCases.length === 0"><td colspan="6" class="empty-state">Chưa có hồ sơ</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <div class="kanban-col col-wait" style="flex: 0.75;">
-                <div class="kb-header">💸 CHỜ GIẢI NGÂN</div>
+            <div class="kanban-col col-wait">
+                <div class="kb-header">✍️ CHỜ GIẢI NGÂN ({{ waitCases.length }})</div>
                 <div class="kb-scroll">
-                    <table class="sub-table">
-                        <thead><tr><th>CIF</th><th>Tên KH</th><th>Số tiền</th><th>Đợi</th></tr></thead>
-                        <tbody>
-                            <tr v-for="c in waitCases" :key="c.case_key" @click="openCaseDetail(c)" style="cursor: pointer;">
-                                <td>{{ c.cif }}</td><td class="text-left"><span class="truncate">{{ smartTruncate(c.customer_name, 18) }}</span></td><td class="text-right no-wrap">{{ formatMoney(c.amount, c.currency) }}</td><td>{{ c.stage_label }}</td>
+                    <table class="main-table">
+                        <thead>
+                            <tr>
+                                <th style="width:15%;">Phòng</th>
+                                <th style="width:32%;" class="text-left">Khách hàng</th>
+                                <th style="width:26%;" class="text-right">Số tiền</th>
+                                <th style="width:15%;">Thời gian</th>
+                                <th style="width:12%;">CB</th>
                             </tr>
-                            <tr v-if="waitCases.length === 0"><td colspan="4" style="color:#999; font-style:italic;">Không có</td></tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="c in waitCases"
+                                :key="c.case_key"
+                                :class="[c.sla_status === 'DANGER' ? 'row-wait-red' : c.sla_status === 'WARNING' || c.sla_status === 'YELLOW' ? 'row-wait-yellow' : '', 'clickable-row']"
+                                @click="openCaseDetail(c)"
+                            >
+                                <td>{{ c.room_short }}</td>
+                                <td class="text-left"><span class="truncate" :title="c.customer_name">{{ smartTruncate(c.customer_name, 24) }}</span></td>
+                                <td class="text-right">{{ formatMoneyFull(c.amount, c.currency) }}</td>
+                                <td>Chờ {{ c.wait_mins }}p</td>
+                                <td>{{ c.cb_id || c.cb_httd || '---' }}</td>
+                            </tr>
+                            <tr v-if="waitCases.length === 0"><td colspan="5" class="empty-state">Chưa có hồ sơ</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <div class="kanban-col col-done" style="flex: 1.1;">
-                <div class="kb-header">✅ HOÀN TẤT</div>
+            <div class="kanban-col col-done">
+                <div class="kb-header">✅ HOÀN TẤT ({{ closedCases.length }})</div>
                 <div class="kb-scroll">
-                    <table class="sub-table">
-                        <thead><tr><th>CIF</th><th>Tên KH</th><th>SLA</th><th>CIF</th><th>Tên KH</th><th>SLA</th></tr></thead>
-                        <tbody>
-                            <tr v-for="(pair, index) in closedCasesPairs" :key="index">
-                                <template v-for="(c, idx) in pair" :key="idx">
-                                    <template v-if="c">
-                                        <td>{{ c.cif }}</td><td class="text-left"><span class="truncate">{{ smartTruncate(c.customer_name, 14) }}</span></td><td :class="c.sla_status === 'DANGER' ? 'time-red' : 'time-green'">{{ c.time_display }}</td>
-                                    </template>
-                                    <template v-else><td></td><td></td><td></td></template>
-                                </template>
+                    <table class="sub-table" style="table-layout: fixed; width: 100%;">
+                        <thead>
+                            <tr>
+                                <th style="width:33%;" class="text-left">Khách hàng</th>
+                                <th style="width:16%;" class="text-right">Số tiền</th>
+                                <th style="width:2%;" class="gap-col"></th>
+                                <th style="width:33%;" class="text-left">Khách hàng</th>
+                                <th style="width:16%;" class="text-right">Số tiền</th>
                             </tr>
-                            <tr v-if="closedCases.length === 0"><td colspan="6" style="color:#999; font-style:italic;">Chưa có hồ sơ hoàn tất</td></tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(pair, idx) in closedCasesPairs" :key="idx">
+                                <td class="text-left" style="border-right: none;"><span class="truncate" :title="pair[0].customer_name">{{ smartTruncate(pair[0].customer_name, 25) }}</span></td>
+                                <td class="text-right" style="border-right: 1px solid #edf2f7;">{{ formatMoney(pair[0].amount, pair[0].currency) }}</td>
+                                <td class="gap-col"></td>
+                                <td class="text-left" style="border-left: 1px solid #edf2f7;"><span v-if="pair[1]" class="truncate" :title="pair[1].customer_name">{{ smartTruncate(pair[1].customer_name, 25) }}</span></td>
+                                <td class="text-right"><span v-if="pair[1]">{{ formatMoney(pair[1].amount, pair[1].currency) }}</span></td>
+                            </tr>
+                            <tr v-if="closedCases.length === 0"><td colspan="5" class="empty-state">Chưa có hồ sơ</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -689,11 +755,68 @@ const closedCasesPairs = computed(() => {
 .officer-progress-processing { background: linear-gradient(90deg, #f5a623, #f39c12); }
 .officer-progress-closed { background: linear-gradient(90deg, #22a861, #27ae60); }
 
-.kanban-board { display: flex; gap: 15px; flex-grow: 1; overflow: hidden; padding-bottom: 5px; }
-.kanban-col { background: #ffffff; border-radius: 12px; padding: 9px 13px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 5px 15px rgba(0, 89, 147, 0.08); }
-.col-open { flex: 1.3; border-top: 5px solid #005993; }
-.col-wait { flex: 1; border-top: 5px solid #f39c12; }
-.col-done { border-top: 5px solid #27ae60; }
+.kanban-board {
+    display: grid;
+    grid-template-columns: minmax(0, 58fr) minmax(360px, 42fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 15px;
+    flex-grow: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: 5px;
+}
+
+.kanban-col {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 9px 13px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0, 89, 147, 0.08);
+    min-width: 0;
+    min-height: 0;
+}
+
+.col-open {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    border-top: 5px solid #005993;
+}
+
+.col-wait {
+    grid-column: 2;
+    grid-row: 1;
+    border-top: 5px solid #f39c12;
+}
+
+.col-done {
+    grid-column: 2;
+    grid-row: 2;
+    border-top: 5px solid #27ae60;
+}
+
+.kb-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+@media (max-width: 1180px) {
+    .kanban-board {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+        overflow-y: auto;
+    }
+
+    .col-open,
+    .col-wait,
+    .col-done {
+        grid-column: 1;
+        grid-row: auto;
+        min-height: 260px;
+    }
+}
 
 .kb-header { font-size: 17px; font-weight: 800; color: #005993; text-transform: uppercase; margin-bottom: 6px; display: flex; align-items: center; gap: 7px; }
 .kb-title-sub { font-size: 14px; font-weight: 700; color: #d35400; text-transform: uppercase; margin-top: 4px; margin-bottom: 5px; background-color: #fff3e0; padding: 3px 9px; border-radius: 6px; display: inline-block; }
@@ -715,17 +838,24 @@ const closedCasesPairs = computed(() => {
 .text-right { text-align: right !important; padding-right: 8px !important; }
 .truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 .no-wrap { white-space: nowrap; }
+.clickable-row { cursor: pointer; transition: background-color 0.2s; }
+.clickable-row:hover td { background-color: #cbd5e1 !important; }
+.empty-state { text-align: center; color: #94a3b8 !important; font-style: italic; padding: 20px; }
 
 /* Cảnh báo SLA */
 .sla-green td { background-color: #d4edda !important; border-color: #c3e6cb !important; }
 .sla-yellow td { background-color: #fff3cd !important; border-color: #ffe8a1 !important; }
 .sla-orange td { background-color: #ffe8cc !important; border-color: #ffd199 !important; }
 .sla-red td { background-color: #f8d7da !important; color: #a00000 !important; font-weight: bold; border-color: #f5c6cb !important; }
+.row-wait-red td, .row-wait-red td span { color: #c0392b !important; font-weight: bold; }
+.row-wait-yellow td, .row-wait-yellow td span { color: #f39c12 !important; font-weight: bold; }
 
 .time-green { color: #27ae60 !important; }
 .time-red { color: #c0392b !important; }
 .time-orange { color: #f39c12 !important; }
 .time-yellow { color: #d4ac0d !important; font-weight: bold; }
+.sub-table th.gap-col, .sub-table td.gap-col { background-color: #ffffff !important; border-top: 1px solid #ffffff !important; border-bottom: 1px solid #ffffff !important; }
+.sub-table tr:nth-child(even) td.gap-col, .sub-table tr:hover td.gap-col { background-color: #ffffff !important; }
 
 .chart-bar-hover:hover { opacity: 0.8; }
 .stat-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #005993; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 100; max-height: 250px; overflow-y: auto; margin-top: 2px; }
